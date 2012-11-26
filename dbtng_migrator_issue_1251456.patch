@@ -1,0 +1,11 @@
+--- a/dbtng_migrator.batch.inc	2012-11-26 14:40:53.000000000 +0100
++++ b/dbtng_migrator.batch.inc	2012-11-26 14:41:47.000000000 +0100
+@@ -9,6 +9,8 @@
+  */
+ function dbtng_migrator_batch_initialise_destination($destination) {
+   include_once DRUPAL_ROOT . '/includes/install.inc';
++  // patch for issue http://drupal.org/node/1251456
++  drupal_load_updates();
+   // The Drupal database driver installer specifically uses the
+   // default target and key from the $databases global variable.
+   // Therefore, we'll need to rename the default connection and
