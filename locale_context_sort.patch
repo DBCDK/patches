@@ -1,0 +1,140 @@
+From f534bf1801e9c603cacab22a7d7a9df510100a80 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20M=C3=B8ller?= <mmj@dbc.dk>
+Date: Wed, 28 Nov 2012 14:04:36 +0100
+Subject: [PATCH] Sorting by context in Translate Interface
+
+---
+ includes/locale.inc             | 57 +++++++++++++++++++++--------------------
+ modules/locale/locale.admin.inc | 12 +++++++++
+ modules/locale/locale.module    |  9 +++++++
+ 3 files changed, 50 insertions(+), 28 deletions(-)
+
+diff --git a/includes/locale.inc b/includes/locale.inc
+index c168da0..9c93b00 100644
+--- a/includes/locale.inc
++++ b/includes/locale.inc
+@@ -1874,33 +1874,34 @@ function _locale_translate_seek() {
+   $sql_query->fields('t', array('translation', 'language'));
+ 
+   // Compute LIKE section.
+-  switch ($query['translation']) {
+-    case 'translated':
+-      $sql_query->condition('t.translation', '%' . db_like($query['string']) . '%', 'LIKE');
+-      $sql_query->orderBy('t.translation', 'DESC');
+-      break;
+-    case 'untranslated':
+-      $sql_query->condition(db_and()
+-        ->condition('s.source', '%' . db_like($query['string']) . '%', 'LIKE')
+-        ->isNull('t.translation')
+-      );
+-      $sql_query->orderBy('s.source');
+-      break;
+-    case 'all' :
+-    default:
+-      $condition = db_or()
+-        ->condition('s.source', '%' . db_like($query['string']) . '%', 'LIKE');
+-      if ($query['language'] != 'en') {
+-        // Only search in translations if the language is not forced to English.
+-        $condition->condition('t.translation', '%' . db_like($query['string']) . '%', 'LIKE');
+-      }
+-      $sql_query->condition($condition);
+-      break;
++  if ($query['group'] != 'context') {
++    switch ($query['translation']) {
++      case 'translated':
++        $sql_query->condition('t.translation', '%' . db_like($query['string']) . '%', 'LIKE');
++        $sql_query->orderBy('t.translation', 'DESC');
++        break;
++      case 'untranslated':
++        $sql_query->condition(db_and()
++            ->condition('s.source', '%' . db_like($query['string']) . '%', 'LIKE')
++            ->isNull('t.translation')
++        );
++        $sql_query->orderBy('s.source');
++        break;
++      case 'all' :
++      default:
++        $condition = db_or()
++          ->condition('s.source', '%' . db_like($query['string']) . '%', 'LIKE');
++        if ($query['language'] != 'en') {
++          // Only search in translations if the language is not forced to English.
++          $condition->condition('t.translation', '%' . db_like($query['string']) . '%', 'LIKE');
++        }
++        $condition->condition('s.context', '%' . db_like($query['string']) . '%', 'LIKE');
++        $sql_query->condition($condition);
++        break;
++    }
+   }
+-
+-  // Add a condition on the text group.
+-  if (!empty($query['group']) && $query['group'] != 'all') {
+-    $sql_query->condition('s.textgroup', $query['group']);
++  else {
++    $sql_query->condition('s.context', '%' . db_like($query['string']) . '%', 'LIKE');
+   }
+ 
+   $sql_query = $sql_query->extend('PagerDefault')->limit(50);
+@@ -1917,7 +1918,7 @@ function _locale_translate_seek() {
+         'languages' => array(),
+         'location' => $locale->location,
+         'source' => $locale->source,
+-        'context' => $locale->context,
++        'context' => (!empty($locale->context)) ? l($locale->context, 'admin/config/regional/translate/sortcontext/' . $locale->context) : '',
+       );
+     }
+     if (isset($locale->language)) {
+@@ -1950,7 +1951,7 @@ function _locale_translate_seek_query() {
+   $query = &drupal_static(__FUNCTION__);
+   if (!isset($query)) {
+     $query = array();
+-    $fields = array('string', 'language', 'translation', 'group');
++    $fields = array('string', 'language', 'translation', 'group', 'context');
+     foreach ($fields as $field) {
+       if (isset($_SESSION['locale_translation_filter'][$field])) {
+         $query[$field] = $_SESSION['locale_translation_filter'][$field];
+diff --git a/modules/locale/locale.admin.inc b/modules/locale/locale.admin.inc
+index 2535357..eedbc4a 100644
+--- a/modules/locale/locale.admin.inc
++++ b/modules/locale/locale.admin.inc
+@@ -923,6 +923,18 @@ function locale_translation_filter_form_submit($form, &$form_state) {
+ }
+ 
+ /**
++ * Sets parameters in session variable used for search in contexts
++ * @param $key String
++ */
++function locale_translate_sort_by_context($key) {
++  $_SESSION['locale_translation_filter']['language'] = 'all';
++  $_SESSION['locale_translation_filter']['translation'] = 'all';
++  $_SESSION['locale_translation_filter']['group'] = 'context';
++  $_SESSION['locale_translation_filter']['string'] = $key;
++  drupal_goto('admin/config/regional/translate/translate');
++}
++
++/**
+  * User interface for the translation import screen.
+  */
+ function locale_translate_import_form($form) {
+diff --git a/modules/locale/locale.module b/modules/locale/locale.module
+index 94e7cd1..e80fa0b 100644
+--- a/modules/locale/locale.module
++++ b/modules/locale/locale.module
+@@ -156,6 +156,15 @@ function locale_menu() {
+     'access arguments' => array('translate interface'),
+     'file' => 'locale.admin.inc',
+   );
++  $items['admin/config/regional/translate/sortcontext/%'] = array(
++    'title' => 'Translate',
++    'weight' => 15,
++    'type' => MENU_CALLBACK,
++    'page callback' => 'locale_translate_sort_by_context',
++    'page arguments' => array(5),
++    'access arguments' => array('translate interface'),
++    'file' => 'locale.admin.inc',
++  );
+   $items['admin/config/regional/translate/import'] = array(
+     'title' => 'Import',
+     'page callback' => 'drupal_get_form',
+-- 
+1.7.11.1
+
