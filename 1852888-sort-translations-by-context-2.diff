@@ -1,14 +1,3 @@
-From 45e687fb452b83ccac564f504bb77b96a9eefb73 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Martin=20M=C3=B8ller?= <mmj@dbc.dk>
-Date: Wed, 28 Nov 2012 16:12:44 +0100
-Subject: [PATCH] no message
-
----
- includes/locale.inc             | 57 +++++++++++++++++++++--------------------
- modules/locale/locale.admin.inc | 12 +++++++++
- modules/locale/locale.module    |  9 +++++++
- 3 files changed, 50 insertions(+), 28 deletions(-)
-
 diff --git a/includes/locale.inc b/includes/locale.inc
 index c168da0..9c93b00 100644
 --- a/includes/locale.inc
@@ -116,7 +105,7 @@ index 2535357..eedbc4a 100644
   */
  function locale_translate_import_form($form) {
 diff --git a/modules/locale/locale.module b/modules/locale/locale.module
-index 94e7cd1..e80fa0b 100644
+index 94e7cd1..f66b02a 100644
 --- a/modules/locale/locale.module
 +++ b/modules/locale/locale.module
 @@ -156,6 +156,15 @@ function locale_menu() {
@@ -135,6 +124,12 @@ index 94e7cd1..e80fa0b 100644
    $items['admin/config/regional/translate/import'] = array(
      'title' => 'Import',
      'page callback' => 'drupal_get_form',
--- 
-1.7.11.1
-
+@@ -264,7 +273,7 @@ function locale_permission() {
+ function locale_locale($op = 'groups') {
+   switch ($op) {
+     case 'groups':
+-      return array('default' => t('Built-in interface'));
++      return array('default' => t('Built-in interface'), 'context' => t('Context'));
+   }
+ }
+ 
