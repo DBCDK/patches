@@ -1,0 +1,43 @@
+diff --git a/nanosoap.inc b/nanosoap.inc
+index 29235d5..c4cd981 100644
+--- a/nanosoap.inc
++++ b/nanosoap.inc
+@@ -6,7 +6,7 @@
+ 
+ class NanoSOAPClient {
+   const XML_HEADER = '<?xml version="1.0" encoding="UTF-8"?>';
+-  const USER_AGENT = 'NanoSOAP for Drupal';
++  private static $USER_AGENT = 'NanoSOAP for Drupal';
+ 
+   /**
+    * SOAP endpoint, the URL to call SOAP requests on.
+@@ -43,6 +43,20 @@ class NanoSOAPClient {
+   }
+ 
+   /**
++   * Changes the user agent string
++   *
++   * @param string $user_agent
++   *   New value for the user agent string.
++   */
++  public static function setUserAgent($user_agent = 'NanoSOAP for Drupal') {
++    self::$USER_AGENT = $user_agent;
++  }
++
++  public static function getUserAgent() {
++    return self::$USER_AGENT;
++  }
++
++  /**
+    * Make a cURL request.
+    *
+    * This is usually a SOAP request, but could ostensibly be used for
+@@ -65,7 +79,7 @@ class NanoSOAPClient {
+     // details on what options are available.
+     $curl_options = array(
+       CURLOPT_URL => $url,
+-      CURLOPT_USERAGENT => self::USER_AGENT,
++      CURLOPT_USERAGENT => self::$USER_AGENT,
+       CURLOPT_RETURNTRANSFER => TRUE,
+     );
+ 
