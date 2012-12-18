@@ -1,5 +1,5 @@
 diff --git a/nanosoap.inc b/nanosoap.inc
-index 29235d5..c4cd981 100644
+index 29235d5..f66a977 100644
 --- a/nanosoap.inc
 +++ b/nanosoap.inc
 @@ -6,7 +6,7 @@
@@ -11,7 +11,7 @@ index 29235d5..c4cd981 100644
  
    /**
     * SOAP endpoint, the URL to call SOAP requests on.
-@@ -43,6 +43,20 @@ class NanoSOAPClient {
+@@ -43,6 +43,26 @@ class NanoSOAPClient {
    }
  
    /**
@@ -24,6 +24,12 @@ index 29235d5..c4cd981 100644
 +    self::$USER_AGENT = $user_agent;
 +  }
 +
++  /**
++   * Gets the user agent string
++   *
++   * @return string
++   *   Value of the user agent string.
++   */
 +  public static function getUserAgent() {
 +    return self::$USER_AGENT;
 +  }
@@ -32,7 +38,7 @@ index 29235d5..c4cd981 100644
     * Make a cURL request.
     *
     * This is usually a SOAP request, but could ostensibly be used for
-@@ -65,7 +79,7 @@ class NanoSOAPClient {
+@@ -65,7 +85,7 @@ class NanoSOAPClient {
      // details on what options are available.
      $curl_options = array(
        CURLOPT_URL => $url,
