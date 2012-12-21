@@ -1,35 +1,8 @@
-diff --git a/l10n_client.js b/l10n_client.js
-index a78afc4..3df78f7 100644
---- a/l10n_client.js
-+++ b/l10n_client.js
-@@ -158,7 +158,7 @@ Drupal.behaviors.l10nClient.attach = function (context) {
-     Drupal.l10nClient.filter(false);
-     return false;
-   });
--
-+//TODO mmj if possible saving to local db should be postponed until we get a possitive reposne from the server
-   // Send AJAX POST data on form submit.
-   $('#l10n-client-form').submit(function() {
-     $('#l10n-client-form .form-submit').attr("disabled", "true");
 diff --git a/l10n_client.module b/l10n_client.module
-index fb20360..91fc3d3 100644
+index acb321b..eb6f423 100644
 --- a/l10n_client.module
 +++ b/l10n_client.module
-@@ -447,11 +447,13 @@ function l10n_client_search_form() {
-  * Menu callback. Saves a string translation coming as POST data.
-  */
- function l10n_client_save_string() {
-+  fb('l10n_client_save_string');
-   global $user, $language;
- 
-   if (l10n_client_access()) {
-     if (isset($_POST['source']) && isset($_POST['target']) && !empty($_POST['textgroup']) && !empty($_POST['form_token']) && drupal_valid_token($_POST['form_token'], 'l10n_client_form')) {
-       // Ensure we have this source string before we attempt to save it.
-+      //TODO should be rewritten to take use of the Drupal database API
-       $lid = db_query("SELECT lid FROM {locales_source} WHERE source = :source AND context = :context AND textgroup = :textgroup", array(':source' => $_POST['source'], ':context' => $_POST['context'], ':textgroup' => $_POST['textgroup']))->fetchField();
- 
-       if (!empty($lid)) {
-@@ -476,7 +478,7 @@ function l10n_client_save_string() {
+@@ -476,7 +476,7 @@ function l10n_client_save_string() {
          // Submit to remote server if enabled.
          if (variable_get('l10n_client_use_server', FALSE) && user_access('submit translations to localization server') && ($_POST['textgroup'] == 'default')) {
            if (!empty($user->data['l10n_client_key'])) {
@@ -38,7 +11,7 @@ index fb20360..91fc3d3 100644
              $message .= theme('l10n_client_message', array('message' => $remote_result[1], 'level' => $remote_result[0] ? WATCHDOG_INFO : WATCHDOG_ERROR));
            }
            else {
-@@ -538,6 +540,12 @@ function l10n_client_settings_form() {
+@@ -538,6 +538,12 @@ function l10n_client_settings_form() {
      '#description' => t('Each translation submission will also be submitted to this server. We suggest you enter <a href="@localize">http://localize.drupal.org</a> to share with the greater Drupal community. Make sure you set up an API-key in the user account settings for each user that will participate in the translations.', array('@localize' => 'http://localize.drupal.org')),
      '#default_value' => variable_get('l10n_client_server', 'http://localize.drupal.org'),
    );
@@ -51,25 +24,25 @@ index fb20360..91fc3d3 100644
    return system_settings_form($form);
  }
  
-@@ -635,10 +643,12 @@ function l10n_client_user_token($account = NULL) {
+@@ -635,10 +641,11 @@ function l10n_client_user_token($account = NULL) {
  /**
   * Submit translation to the server.
   */
 -function l10n_client_submit_translation($langcode, $source, $translation, $user_key, $user_token) {
--  $server_uid = current(split(':', $user_key));
 +function l10n_client_submit_translation($langcode, $source, $translation, $user_key, $user_token, $context) {
-+  //TODO mmj can we include context?
-+  $server_uid = current(explode(':', $user_key));
+   $server_uid = current(explode(':', $user_key));
    $signature = md5($user_key . $langcode . $source . $translation . $user_token);
    $server_url = variable_get('l10n_client_server', 'http://localize.drupal.org');
 +  $project = variable_get('l10n_client_localisation_project', NULL);
  
    $response = xmlrpc(
      $server_url .'/xmlrpc.php',
-@@ -649,6 +659,8 @@ function l10n_client_submit_translation($langcode, $source, $translation, $user_
+@@ -648,7 +655,9 @@ function l10n_client_submit_translation($langcode, $source, $translation, $user_
+       $translation,
        (int)$server_uid,
        $user_token,
-       $signature,
+-      $signature
++      $signature,
 +      $context,
 +      $project
      ))
