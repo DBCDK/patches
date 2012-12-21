@@ -1,0 +1,100 @@
+diff --git a/l10n_client.js b/l10n_client.js
+index def53e7..a78afc4 100644
+--- a/l10n_client.js
++++ b/l10n_client.js
+@@ -20,7 +20,7 @@ $.extend(Drupal, {
+             Drupal.l10nClient.toggle(1);
+             $('#l10n-client .string-search').focus();
+           } else {
+-            if($('#l10n-client').is('.hidden')) {
++            if($('#l10n-client').is('.l10n-client-minimized')) {
+               Drupal.l10nClient.toggle(1);
+               if(!$.browser.safari) {
+                 $('#l10n-client .string-search').focus();
+@@ -40,7 +40,7 @@ $.extend(Drupal, {
+       switch(state) {
+         case 1:
+           $('#l10n-client-string-select, #l10n-client-string-editor, #l10n-client .labels .label').show();
+-          $('#l10n-client').height('22em').removeClass('hidden');
++          $('#l10n-client').height('22em').removeClass('l10n-client-minimized');
+           $('#l10n-client .labels .toggle').text('X');
+           if(!$.browser.msie) {
+             $('body').css('border-bottom', '22em solid #fff');
+@@ -49,7 +49,7 @@ $.extend(Drupal, {
+         break;
+         case 0:
+           $('#l10n-client-string-select, #l10n-client-string-editor, #l10n-client .labels .label').hide();
+-          $('#l10n-client').height('2em').addClass('hidden');
++          $('#l10n-client').height('2em').addClass('l10n-client-minimized');
+           $('#l10n-client .labels .toggle').text(Drupal.t('Translate Text'));
+           if(!$.browser.msie) {
+             $('body').css('border-bottom', '0px');
+@@ -123,7 +123,7 @@ Drupal.behaviors.l10nClient.attach = function (context) {
+ 
+   // When l10n_client window is clicked, toggle based on current state.
+   $('#l10n-client .labels .toggle').click(function() {
+-    if($('#l10n-client').is('.hidden')) {
++    if($('#l10n-client').is('.l10n-client-minimized')) {
+       Drupal.l10nClient.toggle(1);
+     } else {
+       Drupal.l10nClient.toggle(0);
+diff --git a/l10n_client.module b/l10n_client.module
+index 71811e2..eb6f423 100644
+--- a/l10n_client.module
++++ b/l10n_client.module
+@@ -228,7 +228,7 @@ function l10n_client_page_alter(&$page) {
+     $toggle_label = t('Translate Text');
+ 
+     $output = "
+-      <div id='l10n-client' class='hidden'>
++      <div id='l10n-client' class='l10n-client-minimized'>
+         <div class='labels'>
+           <span class='toggle'>$toggle_label</span>
+           <div class='label strings'>$string_label</div>
+@@ -476,7 +476,7 @@ function l10n_client_save_string() {
+         // Submit to remote server if enabled.
+         if (variable_get('l10n_client_use_server', FALSE) && user_access('submit translations to localization server') && ($_POST['textgroup'] == 'default')) {
+           if (!empty($user->data['l10n_client_key'])) {
+-            $remote_result = l10n_client_submit_translation($language->language, $_POST['source'], $_POST['target'], $user->data['l10n_client_key'], l10n_client_user_token($user));
++            $remote_result = l10n_client_submit_translation($language->language, $_POST['source'], $_POST['target'], $user->data['l10n_client_key'], l10n_client_user_token($user), $_POST['context']);
+             $message .= theme('l10n_client_message', array('message' => $remote_result[1], 'level' => $remote_result[0] ? WATCHDOG_INFO : WATCHDOG_ERROR));
+           }
+           else {
+@@ -538,6 +538,12 @@ function l10n_client_settings_form() {
+     '#description' => t('Each translation submission will also be submitted to this server. We suggest you enter <a href="@localize">http://localize.drupal.org</a> to share with the greater Drupal community. Make sure you set up an API-key in the user account settings for each user that will participate in the translations.', array('@localize' => 'http://localize.drupal.org')),
+     '#default_value' => variable_get('l10n_client_server', 'http://localize.drupal.org'),
+   );
++  $form['l10n_client_localisation_project'] = array(
++    '#title' => t('Project'),
++    '#type' => 'textfield',
++    '#description' => t('What project on the localisation server should this connection refer to? The string you enter in this field should be equal the value entered in the URI field found on the project setup page on the localisation server'),
++    '#default_value' => variable_get('l10n_client_localisation_project', NULL),
++  );
+   return system_settings_form($form);
+ }
+ 
+@@ -635,10 +641,11 @@ function l10n_client_user_token($account = NULL) {
+ /**
+  * Submit translation to the server.
+  */
+-function l10n_client_submit_translation($langcode, $source, $translation, $user_key, $user_token) {
+-  $server_uid = current(split(':', $user_key));
++function l10n_client_submit_translation($langcode, $source, $translation, $user_key, $user_token, $context) {
++  $server_uid = current(explode(':', $user_key));
+   $signature = md5($user_key . $langcode . $source . $translation . $user_token);
+   $server_url = variable_get('l10n_client_server', 'http://localize.drupal.org');
++  $project = variable_get('l10n_client_localisation_project', NULL);
+ 
+   $response = xmlrpc(
+     $server_url .'/xmlrpc.php',
+@@ -648,7 +655,9 @@ function l10n_client_submit_translation($langcode, $source, $translation, $user_
+       $translation,
+       (int)$server_uid,
+       $user_token,
+-      $signature
++      $signature,
++      $context,
++      $project
+     ))
+   );
+ 
