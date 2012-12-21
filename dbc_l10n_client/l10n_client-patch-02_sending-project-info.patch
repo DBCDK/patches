@@ -1,5 +1,5 @@
 diff --git a/l10n_client.module b/l10n_client.module
-index acb321b..eb6f423 100644
+index e3287be..eb6f423 100644
 --- a/l10n_client.module
 +++ b/l10n_client.module
 @@ -476,7 +476,7 @@ function l10n_client_save_string() {
@@ -29,8 +29,9 @@ index acb321b..eb6f423 100644
   * Submit translation to the server.
   */
 -function l10n_client_submit_translation($langcode, $source, $translation, $user_key, $user_token) {
+-  $server_uid = current(split(':', $user_key));
 +function l10n_client_submit_translation($langcode, $source, $translation, $user_key, $user_token, $context) {
-   $server_uid = current(explode(':', $user_key));
++  $server_uid = current(explode(':', $user_key));
    $signature = md5($user_key . $langcode . $source . $translation . $user_token);
    $server_url = variable_get('l10n_client_server', 'http://localize.drupal.org');
 +  $project = variable_get('l10n_client_localisation_project', NULL);
