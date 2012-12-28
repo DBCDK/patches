@@ -1,0 +1,290 @@
+diff --git a/connectors/l10n_gettext/l10n_gettext.module b/connectors/l10n_gettext/l10n_gettext.module
+index f2b1618..bc33f22 100644
+--- a/connectors/l10n_gettext/l10n_gettext.module
++++ b/connectors/l10n_gettext/l10n_gettext.module
+@@ -112,6 +112,7 @@ function l10n_gettext_store_string($value = NULL, $pid = NULL, $rid = NULL, $fid
+ 	->execute();
+     }
+     $sids[$sid] = 1;
++    return $sid;
+   }
+   else {
+     return count($sids);
+diff --git a/l10n_community/l10n_community.admin.inc b/l10n_community/l10n_community.admin.inc
+index 7c1bd7d..676f41a 100644
+--- a/l10n_community/l10n_community.admin.inc
++++ b/l10n_community/l10n_community.admin.inc
+@@ -34,6 +34,12 @@ function l10n_community_settings_form($form, &$form_state) {
+     '#default_value' => variable_get('l10n_community_import_user', ''),
+     '#autocomplete_path' => 'user/autocomplete',
+   );
++  $form['l10n_community_override_suggestions'] = array(
++    '#title' => t('Override the default suggestions feature'),
++    '#description' => t('If checked, will incomming translations be accepted right away'),
++    '#type' => 'checkbox',
++    '#default_value' => variable_get('l10n_community_override_suggestions', FALSE),
++  );
+   $form['l10n_community_highlighted_project'] = array(
+     '#title' => t('Highlight project on the welcome page'),
+     '#description' => t('Pick a project which will be highlighted on the welcome page, so progress of all translation teams can be seen instantly.'),
+diff --git a/l10n_community/l10n_community.module b/l10n_community/l10n_community.module
+index 948e42a..fdfa2c7 100644
+--- a/l10n_community/l10n_community.module
++++ b/l10n_community/l10n_community.module
+@@ -972,6 +972,7 @@ function l10n_community_ajax_releases($form, $form_state) {
+  *   User ID to use to keep history of.
+  * @param $medium
+  *   Medium type constant L10N_SERVER_MEDIUM_*
++ * @return bool|\DatabaseStatementInterface|int|null
+  */
+ function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attribution, $uid_user, $medium) {
+ 
+@@ -997,7 +998,7 @@ function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attri
+     ->fetchObject();
+ 
+   if (!empty($existing)) {
+-    if ($existing->is_active == 0) {
++    if ($existing->is_active == 0 || variable_get('l10n_community_override_suggestions', FALSE) == TRUE) {
+       // If the existing item is not active, make it an active suggestion and clean up its possible previous approval information.
+       db_update('l10n_server_translation')
+         ->fields(array(
+@@ -1042,7 +1043,10 @@ function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attri
+ 
+   // Mark the existing or mock translation as having suggestions.
+   l10n_community_update_string_status($langcode, $sid);
+-
++  // If we're accepting translations right away approve it.
++  if(variable_get('l10n_community_override_suggestions', FALSE) == TRUE){
++    l10n_community_approve_string($langcode, $sid, $tid);
++  }
+   return $tid;
+ }
+ 
+diff --git a/l10n_remote/l10n_remote.module b/l10n_remote/l10n_remote.module
+index f36b4d0..cd16826 100644
+--- a/l10n_remote/l10n_remote.module
++++ b/l10n_remote/l10n_remote.module
+@@ -88,7 +88,7 @@ function l10n_remote_xmlrpc() {
+     array(
+       'l10n.submit.translation',
+       'l10n_remote_xmlrpc_string_submit',
+-      array('struct', 'string', 'string', 'string', 'int', 'string', 'string'),
++      array('struct', 'string', 'string', 'string', 'int', 'string', 'string', 'string', 'string'),
+       t('Handle remote string submissions.'),
+     ),
+   );
+@@ -119,18 +119,18 @@ function l10n_remote_xmlrpc_status($version) {
+ /**
+  * XML-RPC callback to submit strings remotely.
+  */
+-function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid, $client_token, $signature) {
++function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid, $client_token, $signature, $context, $project) {
+ 
+   // Check signature and permission parameters.
+   if (!($uid && $signature == md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $translation . $client_token))) {
+-    //watchdog('l10n_community', 'Submitted translation with wrong parameters or signature.', NULL, WATCHDOG_WARNING);
++    watchdog('l10n_community', 'Submitted translation with wrong parameters or signature.', NULL, WATCHDOG_WARNING);
+     return array('status' => FALSE, 'reason' => 'Wrong parameters or signature. Did you set your user API key on your user account page?');
+   }
+ 
+   // Check whether we have an actual translation to save.
+   $translation = trim($translation);
+   if (empty($translation)) {
+-    //watchdog('l10n_community', 'Empty remote translation submission.', NULL, WATCHDOG_WARNING);
++    watchdog('l10n_community', 'Empty remote translation submission.', NULL, WATCHDOG_WARNING);
+     return array('status' => FALSE, 'reason' => 'Empty translations are not saved.');
+   }
+ 
+@@ -139,14 +139,14 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
+   // To return a single user object, wrap "user_load_multiple" with "array_shift" or equivalent.
+   // Example: array_shift(user_load_multiple(array(), $uid))
+   if (!(($account = user_load($uid)) && $account->status && user_access('access localization community', $account) && user_access('submit suggestions remotely', $account))) {
+-    //watchdog('l10n_community', 'Unauthorized or blocked user attempted submission.', NULL, WATCHDOG_WARNING);
++    watchdog('l10n_community', 'Unauthorized or blocked user attempted submission.', NULL, WATCHDOG_WARNING);
+     return array('status' => FALSE, 'reason' => 'Blocked user account or no permission to submit translations.');
+   }
+ 
+   // Check that the language is set up on the server at all.
+   $languages = l10n_community_get_languages('name');
+   if (!isset($languages[$langcode])) {
+-    //watchdog('l10n_community', 'Language not allowed for remote submission.', NULL, WATCHDOG_WARNING);
++    watchdog('l10n_community', 'Language not allowed for remote submission.', NULL, WATCHDOG_WARNING);
+     return array('status' => FALSE, 'reason' => 'Language not accepted.');
+   }
+ 
+@@ -160,7 +160,7 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
+ 
+   // Check if the user has permission to submit strings in this language.
+   if (!user_access('submit suggestions', $account)) {
+-    //watchdog('l10n_community', 'Not allowed to submit translations in this language remotely.', NULL, WATCHDOG_WARNING);
++    watchdog('l10n_community', 'Not allowed to submit translations in this language remotely.', NULL, WATCHDOG_WARNING);
+     return array('status' => FALSE, 'reason' => 'Not allowed to submit translations in this language.');
+   }
+ 
+@@ -168,25 +168,76 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
+   // @todo: add context support as soon as l10n_client starts to support it!
+   // @todo: append $context to $source in MD5 counting when available.
+   $select = db_select('l10n_server_string', 's')->fields('s', array('sid'))
+-    ->condition('hashkey', md5($source));
++    ->condition('hashkey', md5($source . $context));
+   $sid = $select->execute()->fetchField();
+   if (!$sid) {
+-    //watchdog('l10n_community', 'Source string does not exist on server.', NULL, WATCHDOG_WARNING);
+-    return array('status' => FALSE, 'reason' => 'Source string not found on server, translation not saved.');
++    watchdog('l10n_community', 'Source string does not exist on server.', array(), WATCHDOG_WARNING);
++    //TODO mmj do this in a nicer way...
++    if($project != NULL) {
++      $sid = dbc_l10n_remote_add_string($langcode, $source, $translation, $uid, $client_token, $signature, $context, $project);
++      watchdog('l10n_community', 'Source string was saved as a new string.', array(), WATCHDOG_INFO);
++    }
++    else {
++      watchdog('l10n_community', 'Source string was NOT saved as a new string.', array(), WATCHDOG_ERROR);
++      return array('status' => FALSE, 'reason' => 'Source string not found on server, translation not saved.');
++    }
+   }
+ 
+   // Attempt to add this as a suggestion.
+   $tid = l10n_community_add_suggestion($sid, $translation, $langcode, $uid, $uid, L10N_SERVER_MEDIUM_REMOTE);
+ 
+   if ($tid === FALSE) {
+-    //watchdog('l10n_community', 'Duplicate translation submitted.', NULL, WATCHDOG_WARNING);
++    watchdog('l10n_community', 'Duplicate translation submitted.', NULL, WATCHDOG_WARNING);
+     return array('status' => FALSE, 'reason' => 'Suggested translation already appears as active translation or suggestion.');
+   }
+   elseif ($tid === NULL) {
+-    //watchdog('l10n_community', 'Empty suggestions are not saved.', NULL, WATCHDOG_WARNING);
++    watchdog('l10n_community', 'Empty suggestions are not saved.', NULL, WATCHDOG_WARNING);
+     return array('status' => FALSE, 'reason' => 'Empty suggestions are not saved.');
+   }
+ 
+   // If we got this far, everything is fine. Signal success to the client.
+   return array('status' => TRUE, 'sid' => $sid);
+ }
++
++/**
++ * If source doesn't exsist already it will be added to db
++ *
++ * @param $langcode String
++ * @param $source String
++ * @param $translation String
++ * @param $uid int
++ * @param $client_token String
++ * @param $signature String
++ * @param $context String
++ * @param $project String
++ * @return int
++ */
++function dbc_l10n_remote_add_string($langcode, $source, $translation, $uid, $client_token, $signature, $context, $project) {
++  module_load_include('module', 'l10n_gettext');
++  $value = array(
++    'msgid' => $source,
++    'msgctxt' => $context,
++  );
++
++  //TODO the below three queries to db could probably be made in one call
++  $pid = db_select('l10n_server_project', 'p')->fields('p', array('pid'))
++    ->condition('uri', $project)
++    ->execute()
++    ->fetchField();
++
++  $rid = db_select('l10n_server_release', 'r')->fields('r', array('rid'))
++    ->condition('pid', $pid)
++    ->orderBy('rid', 'DESC')
++    ->execute()
++    ->fetchField();
++
++  $fid = db_select('l10n_server_file', 'f')->fields('f', array('fid'))
++    ->condition('pid', $pid)
++    ->condition('rid', $rid)
++    ->execute()
++    ->fetchField();
++
++  $sid = l10n_gettext_store_string($value, $pid, $rid, $fid);
++
++  return $sid;
++}
+diff --git a/l10n_server/l10n_server.install b/l10n_server/l10n_server.install
+index ddf19eb..5583769 100644
+--- a/l10n_server/l10n_server.install
++++ b/l10n_server/l10n_server.install
+@@ -70,6 +70,12 @@ function l10n_server_schema() {
+         'not null' => TRUE,
+         'default' => 0,
+       ),
++      'accept_suggestions' => array(
++        'description' => 'Whether the project will surpress the suggestion feature and accept suggestions right away = 1, 0 = new translations will be considered as suggestions',
++        'type' => 'int',
++        'not null' => TRUE,
++        'default' => 0,
++      ),
+     ),
+     'primary key' => array('pid'),
+     'indexes' => array(
+@@ -458,3 +464,15 @@ function l10n_server_update_7000() {
+     'default' => 0,
+   ));
+ }
++
++/**
++ * Add field to hold suggestion value for projects
++ */
++function l10n_server_update_7001() {
++  db_add_field('l10n_server_project', 'accept_suggestions', array(
++    'description' => 'Whether the project will surpress the suggestion feature and accept suggestions right away = 1, 0 = new translations will be considered as suggestions',
++    'type' => 'int',
++    'not null' => TRUE,
++    'default' => 0,
++  ));
++}
+diff --git a/l10n_server/l10n_server.module b/l10n_server/l10n_server.module
+index 4e80435..0544061 100644
+--- a/l10n_server/l10n_server.module
++++ b/l10n_server/l10n_server.module
+@@ -656,6 +656,7 @@ function l10n_server_split_connector($connector_module) {
+  *   Callback invoked to save a string.
+  * @param $callback_arguments
+  *   Array of arguments to pass on to the callback after the string found.
++ * @return bool
+  */
+ function l10n_server_parse_po($file, $string_callback, $callback_arguments) {
+   include_once DRUPAL_ROOT . '/' . 'includes/locale.inc';
+diff --git a/l10n_server/l10n_server.projects.inc b/l10n_server/l10n_server.projects.inc
+index 033b1a0..9491366 100644
+--- a/l10n_server/l10n_server.projects.inc
++++ b/l10n_server/l10n_server.projects.inc
+@@ -315,6 +315,7 @@ function l10n_server_admin_projects_cleanup_form_submit($form, &$form_state) {
+  * Project editing and submission form.
+  */
+ function l10n_server_admin_projects_edit_form($form, &$form_state, $project_uri = NULL) {
++
+   if (!isset($project_uri)) {
+     $connector_list = l10n_server_get_add_enabled_project_connectors();
+     // Provide sensible default for project if adding new one.
+@@ -373,6 +374,12 @@ function l10n_server_admin_projects_edit_form($form, &$form_state, $project_uri
+     '#description' => t('Weight of the project. Lighter projects float up when ordering by weight.'),
+     '#default_value' => $project->weight,
+   );
++  $form['accept_suggestions'] = array(
++    '#type' => 'checkbox',
++    '#title' => t('Override suggestions'),
++    '#description' => t('NOT YET FUNCTIONAL! Go to ' .l(t('l10n_server settings'), 'admin/l10n_server/l10n_community') . ' to enable the functionality. Should this project accepts submissions right away? If checked incoming translations will be accepted right away'),
++    '#default_value' => 0,
++  );
+   $form['submit'] = array(
+     '#type' => 'submit',
+     '#value' => t('Save project'),
+@@ -402,13 +409,12 @@ function l10n_server_admin_projects_edit_form_validate($form, &$form_state) {
+  */
+ function l10n_server_admin_projects_edit_form_submit($form, &$form_state) {
+   $new_project = $form_state['values']['previous_project'];
+-  foreach (array('uri', 'title', 'home_link', 'connector_module', 'weight') as $property) {
++  foreach (array('uri', 'title', 'home_link', 'connector_module', 'weight', 'accept_suggestions') as $property) {
+     if (isset($form_state['values'][$property])) {
+       $new_project->$property = $form_state['values'][$property];
+     }
+   }
+   $new_project->weight = (int) $new_project->weight;
+-
+   drupal_write_record('l10n_server_project', $new_project, !empty($new_project->pid) ? 'pid' : array());
+   drupal_set_message(t('Project data saved.'));
+   $form_state['redirect'] = 'admin/l10n_server/projects';
