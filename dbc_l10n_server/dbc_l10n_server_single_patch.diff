@@ -134,7 +134,7 @@ index f36b4d0..cd16826 100644
 +    watchdog('l10n_community', 'Source string does not exist on server.', array(), WATCHDOG_WARNING);
 +    //TODO mmj do this in a nicer way...
 +    if($project != NULL) {
-+      $sid = dbc_l10n_remote_add_string($langcode, $source, $translation, $uid, $client_token, $signature, $context, $project);
++      $sid = dbc_l10n_remote_add_string($source, $context, $project);
 +      watchdog('l10n_community', 'Source string was saved as a new string.', array(), WATCHDOG_INFO);
 +    }
 +    else {
@@ -174,7 +174,7 @@ index f36b4d0..cd16826 100644
 + * @param $project String
 + * @return int
 + */
-+function dbc_l10n_remote_add_string($langcode, $source, $translation, $uid, $client_token, $signature, $context, $project) {
++function dbc_l10n_remote_add_string($source, $context, $project) {
 +  module_load_include('module', 'l10n_gettext');
 +  $value = array(
 +    'msgid' => $source,
