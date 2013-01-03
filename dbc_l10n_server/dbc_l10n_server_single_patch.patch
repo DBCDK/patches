@@ -1,3 +1,74 @@
+diff --git a/README.txt b/README.txt
+index c4cf784..fe052c1 100644
+--- a/README.txt
++++ b/README.txt
+@@ -1,3 +1,28 @@
++DBC RELATED INFORMATION
++--------------------------------------------------------------------------------
++This module is a clone of the l10n_server module found on
++http://drupal.org/project/l10n_server
++
++The code is based on the 7.x-1.x-dev version of the module. As the original
++module currently is in a state of development, code can change without warning
++why the module has been cloned and put into it's own repository where
++development has continued to make the module fit with the needs of DBC A/S.
++
++Features:
++ - Associate l10n_client translations with a specific project on the server
++ - On project level admin can choose whether to accept accept suggestions
++   automatically, without manual approval
++ - Strings unknown to the server will be added with the projects specified in
++   the l10n_client request
++
++To take use of the changes made to the module one will need to patch l10n_client
++with the patch found at:
++https://raw.github.com/DBCDK/patches/master/dbc_l10n_client/
++dbc_l10n_client_patch.patch
++
++Feel free to fork, clone and modify the code as needed.
++
++Martin Møller http://drupal.org/user/707688/ (Current DBC maintainer)
+ 
+ Localization server module suite
+ --------------------------------------------------------------------------------
+@@ -7,8 +32,8 @@ Support queue: http://drupal.org/project/issues/l10n_server
+ ABOUT
+ --------------------------------------------------------------------------------
+ 
+-The localization server project (formerly known as lt_server) provides a 
+-community localization editor, which allows people from around the world to 
++The localization server project (formerly known as lt_server) provides a
++community localization editor, which allows people from around the world to
+ collaborate on translating Drupal projects to different languages. It is
+ inspired by Launchpad Rosetta (https://launchpad.net/rosetta) but is highly
+ tailored to Drupal needs.
+@@ -25,20 +50,20 @@ The localization server module suite consists of a few possible components:
+  - l10n_community: Required. A translation community interface which provides
+    the database backend to store projects and releases, but does not fill these
+    with actual data itself. Uses a role based permission model.
+-   
++
+  - l10n_groups: Optional. An "Organic Groups" module binder, which provides
+    permission handling based on language groups (in addition to the default
+-   role based model used by l10n_community). 
+-   
++   role based model used by l10n_community).
++
+  - A connector module: One required, only use one at a time. Connectors serve
+    the purpose of filling in the actual list of projects, releases and strings
+    used in the released packages. Different connectors allow this suite to be
+    used in different use cases.
+-   
++
+      - l10n_localpacks: Works based on a list of files uploaded to a local
+        file system directory. The projects and releases are identified based
+-       on placement and naming of the package files. 
+-     
++       on placement and naming of the package files.
++
+      - l10n_project: To be used on drupal.org only! Maintains a relation with
+        the drupal.org project and release listings, syncronizes tarballs,
+        collects translatables automatically.
 diff --git a/connectors/l10n_gettext/l10n_gettext.module b/connectors/l10n_gettext/l10n_gettext.module
 index f2b1618..bc33f22 100644
 --- a/connectors/l10n_gettext/l10n_gettext.module
@@ -10,58 +81,68 @@ index f2b1618..bc33f22 100644
    }
    else {
      return count($sids);
-diff --git a/l10n_community/l10n_community.admin.inc b/l10n_community/l10n_community.admin.inc
-index 7c1bd7d..676f41a 100644
---- a/l10n_community/l10n_community.admin.inc
-+++ b/l10n_community/l10n_community.admin.inc
-@@ -34,6 +34,12 @@ function l10n_community_settings_form($form, &$form_state) {
-     '#default_value' => variable_get('l10n_community_import_user', ''),
-     '#autocomplete_path' => 'user/autocomplete',
-   );
-+  $form['l10n_community_override_suggestions'] = array(
-+    '#title' => t('Override the default suggestions feature'),
-+    '#description' => t('If checked, will incomming translations be accepted right away'),
-+    '#type' => 'checkbox',
-+    '#default_value' => variable_get('l10n_community_override_suggestions', FALSE),
-+  );
-   $form['l10n_community_highlighted_project'] = array(
-     '#title' => t('Highlight project on the welcome page'),
-     '#description' => t('Pick a project which will be highlighted on the welcome page, so progress of all translation teams can be seen instantly.'),
 diff --git a/l10n_community/l10n_community.module b/l10n_community/l10n_community.module
-index 948e42a..fdfa2c7 100644
+index 948e42a..465d668 100644
 --- a/l10n_community/l10n_community.module
 +++ b/l10n_community/l10n_community.module
-@@ -972,6 +972,7 @@ function l10n_community_ajax_releases($form, $form_state) {
+@@ -838,10 +838,9 @@ function l10n_community_rebuild_stats() {
+  */
+ function l10n_community_get_highlighted_project() {
+   if ($highlight_project = variable_get('l10n_community_highlighted_project', '')) {
+-    $result = db_query(
+-      "SELECT * FROM {l10n_server_project} WHERE title = :title",
+-      array(':title' => $highlight_project)
+-    );
++    $result = db_select('l10n_server_project', 'p')->fields('p')
++      ->condition('title', $highlight_project)
++      ->execute();
+     if ($project = $result->fetchObject()) {
+       return $project;
+     }
+@@ -856,6 +855,7 @@ function l10n_community_get_highlighted_project() {
+  *
+  * @param $params
+  *   Associative array with unsanitized values.
++ * @return array
+  */
+ function l10n_community_build_filter_values($params) {
+   $project = $release = NULL;
+@@ -972,8 +972,11 @@ function l10n_community_ajax_releases($form, $form_state) {
   *   User ID to use to keep history of.
   * @param $medium
   *   Medium type constant L10N_SERVER_MEDIUM_*
++ * @param $accept_suggestions
++ * @internal param int|null $pid
 + * @return bool|\DatabaseStatementInterface|int|null
   */
- function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attribution, $uid_user, $medium) {
+-function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attribution, $uid_user, $medium) {
++function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attribution, $uid_user, $medium, $accept_suggestions) {
  
-@@ -997,7 +998,7 @@ function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attri
+   // Load source string and adjust translation whitespace based on source.
+   $source_string = db_query('SELECT value FROM {l10n_server_string} WHERE sid = :sid', array(':sid' => $sid))->fetchField();
+@@ -997,7 +1000,7 @@ function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attri
      ->fetchObject();
  
    if (!empty($existing)) {
 -    if ($existing->is_active == 0) {
-+    if ($existing->is_active == 0 || variable_get('l10n_community_override_suggestions', FALSE) == TRUE) {
++    if ($existing->is_active == 0 || $accept_suggestions) {
        // If the existing item is not active, make it an active suggestion and clean up its possible previous approval information.
        db_update('l10n_server_translation')
          ->fields(array(
-@@ -1042,7 +1043,10 @@ function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attri
+@@ -1042,7 +1045,10 @@ function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attri
  
    // Mark the existing or mock translation as having suggestions.
    l10n_community_update_string_status($langcode, $sid);
 -
 +  // If we're accepting translations right away approve it.
-+  if(variable_get('l10n_community_override_suggestions', FALSE) == TRUE){
++  if($accept_suggestions){
 +    l10n_community_approve_string($langcode, $sid, $tid);
 +  }
    return $tid;
  }
  
 diff --git a/l10n_remote/l10n_remote.module b/l10n_remote/l10n_remote.module
-index f36b4d0..cd16826 100644
+index f36b4d0..ff218ae 100644
 --- a/l10n_remote/l10n_remote.module
 +++ b/l10n_remote/l10n_remote.module
 @@ -88,7 +88,7 @@ function l10n_remote_xmlrpc() {
@@ -121,7 +202,7 @@ index f36b4d0..cd16826 100644
      return array('status' => FALSE, 'reason' => 'Not allowed to submit translations in this language.');
    }
  
-@@ -168,25 +168,76 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
+@@ -168,25 +168,89 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
    // @todo: add context support as soon as l10n_client starts to support it!
    // @todo: append $context to $source in MD5 counting when available.
    $select = db_select('l10n_server_string', 's')->fields('s', array('sid'))
@@ -132,10 +213,19 @@ index f36b4d0..cd16826 100644
 -    //watchdog('l10n_community', 'Source string does not exist on server.', NULL, WATCHDOG_WARNING);
 -    return array('status' => FALSE, 'reason' => 'Source string not found on server, translation not saved.');
 +    watchdog('l10n_community', 'Source string does not exist on server.', array(), WATCHDOG_WARNING);
-+    //TODO mmj do this in a nicer way...
-+    if($project != NULL) {
-+      $sid = dbc_l10n_remote_add_string($source, $context, $project);
-+      watchdog('l10n_community', 'Source string was saved as a new string.', array(), WATCHDOG_INFO);
++    if($project) {
++      $asoc = dbc_l10n_remote_add_string($source, $context, $project);
++
++      if(isset($asoc['error'])){
++        watchdog('l10n_community', 'Project %project could not be found on the server.', array('%project' => $project), WATCHDOG_ERROR);
++        return array('status' => FALSE, 'reason' => $asoc['error'] . ', translation not saved.');
++      }
++
++      $sid = $asoc['sid'];
++      $pid = $asoc['pid'];
++      $sel = db_select('l10n_server_project', 'p')->fields('p', array('accept_suggestions'))
++        ->condition('pid', $pid);
++      $accept_suggestions = $sel->execute()->fetchField();
 +    }
 +    else {
 +      watchdog('l10n_community', 'Source string was NOT saved as a new string.', array(), WATCHDOG_ERROR);
@@ -144,7 +234,8 @@ index f36b4d0..cd16826 100644
    }
  
    // Attempt to add this as a suggestion.
-   $tid = l10n_community_add_suggestion($sid, $translation, $langcode, $uid, $uid, L10N_SERVER_MEDIUM_REMOTE);
+-  $tid = l10n_community_add_suggestion($sid, $translation, $langcode, $uid, $uid, L10N_SERVER_MEDIUM_REMOTE);
++  $tid = l10n_community_add_suggestion($sid, $translation, $langcode, $uid, $uid, L10N_SERVER_MEDIUM_REMOTE, $accept_suggestions);
  
    if ($tid === FALSE) {
 -    //watchdog('l10n_community', 'Duplicate translation submitted.', NULL, WATCHDOG_WARNING);
@@ -164,28 +255,31 @@ index f36b4d0..cd16826 100644
 +/**
 + * If source doesn't exsist already it will be added to db
 + *
-+ * @param $langcode String
 + * @param $source String
-+ * @param $translation String
-+ * @param $uid int
-+ * @param $client_token String
-+ * @param $signature String
 + * @param $context String
 + * @param $project String
-+ * @return int
++ * @internal param String $langcode
++ * @internal param String $translation
++ * @internal param int $uid
++ * @internal param String $client_token
++ * @internal param String $signature
++ * @return Array
 + */
-+function dbc_l10n_remote_add_string($source, $context, $project) {
++function dbc_l10n_remote_add_string($source,$context, $project) {
 +  module_load_include('module', 'l10n_gettext');
 +  $value = array(
 +    'msgid' => $source,
 +    'msgctxt' => $context,
 +  );
 +
-+  //TODO the below three queries to db could probably be made in one call
 +  $pid = db_select('l10n_server_project', 'p')->fields('p', array('pid'))
 +    ->condition('uri', $project)
 +    ->execute()
 +    ->fetchField();
++
++  if(!$pid){
++    return array('error' => t('Project "@project" doesn\'t exist on server', array('@project' => $project)) );
++  }
 +
 +  $rid = db_select('l10n_server_release', 'r')->fields('r', array('rid'))
 +    ->condition('pid', $pid)
@@ -200,8 +294,9 @@ index f36b4d0..cd16826 100644
 +    ->fetchField();
 +
 +  $sid = l10n_gettext_store_string($value, $pid, $rid, $fid);
++  watchdog('l10n_community', 'Source string was saved as a new string.', array(), WATCHDOG_INFO);
 +
-+  return $sid;
++  return array('sid' => $sid, 'pid' => $pid);
 +}
 diff --git a/l10n_server/l10n_server.install b/l10n_server/l10n_server.install
 index ddf19eb..5583769 100644
@@ -249,7 +344,7 @@ index 4e80435..0544061 100644
  function l10n_server_parse_po($file, $string_callback, $callback_arguments) {
    include_once DRUPAL_ROOT . '/' . 'includes/locale.inc';
 diff --git a/l10n_server/l10n_server.projects.inc b/l10n_server/l10n_server.projects.inc
-index 033b1a0..9491366 100644
+index 033b1a0..d5a0836 100644
 --- a/l10n_server/l10n_server.projects.inc
 +++ b/l10n_server/l10n_server.projects.inc
 @@ -315,6 +315,7 @@ function l10n_server_admin_projects_cleanup_form_submit($form, &$form_state) {
@@ -267,8 +362,8 @@ index 033b1a0..9491366 100644
 +  $form['accept_suggestions'] = array(
 +    '#type' => 'checkbox',
 +    '#title' => t('Override suggestions'),
-+    '#description' => t('NOT YET FUNCTIONAL! Go to ' .l(t('l10n_server settings'), 'admin/l10n_server/l10n_community') . ' to enable the functionality. Should this project accepts submissions right away? If checked incoming translations will be accepted right away'),
-+    '#default_value' => 0,
++    '#description' => t('Should this project accepts submissions right away? If checked incoming translations will be accepted right away'),
++    '#default_value' => !empty($project->accept_suggestions),
 +  );
    $form['submit'] = array(
      '#type' => 'submit',
