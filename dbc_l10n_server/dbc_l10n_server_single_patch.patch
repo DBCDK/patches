@@ -1,8 +1,8 @@
 diff --git a/README.txt b/README.txt
-index c4cf784..fe052c1 100644
+index c4cf784..4795f24 100644
 --- a/README.txt
 +++ b/README.txt
-@@ -1,3 +1,28 @@
+@@ -1,3 +1,36 @@
 +DBC RELATED INFORMATION
 +--------------------------------------------------------------------------------
 +This module is a clone of the l10n_server module found on
@@ -25,13 +25,21 @@ index c4cf784..fe052c1 100644
 +https://raw.github.com/DBCDK/patches/master/dbc_l10n_client/
 +dbc_l10n_client_patch.patch
 +
++Note that this module in general lacks testing. However, if you plan to make
++any changes should the exsisting tests be run ahead of development as well as
++new code should not be commited without sufficient testing.
++
 +Feel free to fork, clone and modify the code as needed.
++
++All changes made to the module compared to l10n_server 7.x-1.x-dev is collected
++into the patch found at: https://raw.github.com/DBCDK/patches/master/
++dbc_l10n_server/dbc_l10n_server_single_patch.patch
 +
 +Martin Møller http://drupal.org/user/707688/ (Current DBC maintainer)
  
  Localization server module suite
  --------------------------------------------------------------------------------
-@@ -7,8 +32,8 @@ Support queue: http://drupal.org/project/issues/l10n_server
+@@ -7,8 +40,8 @@ Support queue: http://drupal.org/project/issues/l10n_server
  ABOUT
  --------------------------------------------------------------------------------
  
@@ -42,7 +50,7 @@ index c4cf784..fe052c1 100644
  collaborate on translating Drupal projects to different languages. It is
  inspired by Launchpad Rosetta (https://launchpad.net/rosetta) but is highly
  tailored to Drupal needs.
-@@ -25,20 +50,20 @@ The localization server module suite consists of a few possible components:
+@@ -25,20 +58,20 @@ The localization server module suite consists of a few possible components:
   - l10n_community: Required. A translation community interface which provides
     the database backend to store projects and releases, but does not fill these
     with actual data itself. Uses a role based permission model.
@@ -70,11 +78,82 @@ index c4cf784..fe052c1 100644
         the drupal.org project and release listings, syncronizes tarballs,
         collects translatables automatically.
 diff --git a/connectors/l10n_gettext/l10n_gettext.module b/connectors/l10n_gettext/l10n_gettext.module
-index f2b1618..bc33f22 100644
+index f2b1618..a96b619 100644
 --- a/connectors/l10n_gettext/l10n_gettext.module
 +++ b/connectors/l10n_gettext/l10n_gettext.module
-@@ -112,6 +112,7 @@ function l10n_gettext_store_string($value = NULL, $pid = NULL, $rid = NULL, $fid
- 	->execute();
+@@ -37,11 +37,11 @@ function l10n_gettext_upload_handler($form, $form_state) {
+     // Save file info and mark the file parsed.
+     $fid = db_insert('l10n_server_file')
+       ->fields(array(
+-          'pid' => $project->pid,
+-          'rid' => $release->rid,
+-          'location' => $file->filename,
+-          'revision' => '',
+-        ))
++      'pid' => $project->pid,
++      'rid' => $release->rid,
++      'location' => $file->filename,
++      'revision' => '',
++    ))
+       ->execute();
+ 
+     // Do the actual parsing on the local file.
+@@ -49,9 +49,9 @@ function l10n_gettext_upload_handler($form, $form_state) {
+       $sid_count = l10n_gettext_store_string();
+       drupal_set_message(format_plural($sid_count, 'The source file was successfully imported. One source string was added.', 'The source file was successfully imported. @count source strings were added.'));
+       db_update('l10n_server_release')
+-	->fields(array('sid_count' => $sid_count))
+-	->condition('rid', $release->rid)
+-	->execute();
++        ->fields(array('sid_count' => $sid_count))
++        ->condition('rid', $release->rid)
++        ->execute();
+     }
+ 
+     // Update this only once the parsing process succeeds.
+@@ -85,11 +85,11 @@ function l10n_gettext_store_string($value = NULL, $pid = NULL, $rid = NULL, $fid
+     if (!$sid) {
+       // String does not exist.
+       $sid = db_insert('l10n_server_string')
+-	->fields(array(
+-            'value' => $msgid,
+-            'context' => $context,
+-            'hashkey' => md5($msgid . $context),
+-          ))
++        ->fields(array(
++        'value' => $msgid,
++        'context' => $context,
++        'hashkey' => md5($msgid . $context),
++      ))
+         ->execute();
+     }
+ 
+@@ -98,20 +98,21 @@ function l10n_gettext_store_string($value = NULL, $pid = NULL, $rid = NULL, $fid
+       ->condition('sid', $sid)
+       ->condition('lineno', 0)
+       ->condition('type', 2);
+-    if ( ! $select->execute()->fetchField() ) {
++    if (!$select->execute()->fetchField()) {
+       // Location does not exist with this string.
+       db_insert('l10n_server_line')
+-	->fields(array(
+-            'pid' => $pid,
+-            'rid' => $rid,
+-            'fid' => $fid,
+-            'sid' => $sid,
+-            'lineno' => 0,
+-            'type' => 2,
+-          ))
+-	->execute();
++        ->fields(array(
++        'pid' => $pid,
++        'rid' => $rid,
++        'fid' => $fid,
++        'sid' => $sid,
++        'lineno' => 0,
++        'type' => 2,
++      ))
++        ->execute();
      }
      $sids[$sid] = 1;
 +    return $sid;
@@ -141,8 +220,142 @@ index 948e42a..465d668 100644
    return $tid;
  }
  
+diff --git a/l10n_packager/l10n_packager.drush.inc b/l10n_packager/l10n_packager.drush.inc
+index 7b5151f..8569fa2 100644
+--- a/l10n_packager/l10n_packager.drush.inc
++++ b/l10n_packager/l10n_packager.drush.inc
+@@ -25,7 +25,8 @@ function l10n_packager_drush_command() {
+  * Drush command callback
+  */
+ function l10n_packager_drush_update() {
+-  list($checked, $updated, $time) = l10n_packager_check_updates();
++  $result = l10n_packager_check_updates();
++  list($checked, $updated, $time, $rids) = $result;
+   $vars = array(
+     '!checkmax' => variable_get('l10n_packager_release_limit', 10),
+     '!checked' => $checked,
+diff --git a/l10n_packager/l10n_packager.inc b/l10n_packager/l10n_packager.inc
+index 9e9327c..63e363a 100644
+--- a/l10n_packager/l10n_packager.inc
++++ b/l10n_packager/l10n_packager.inc
+@@ -29,6 +29,7 @@ module_load_include('inc', 'l10n_community', 'export');
+  *   Optional language object to check only this one.
+  * @param $cron
+  *   In a cron run, a release may be packaged partially, for some languages.
++ * @return array
+  */
+ function l10n_packager_release_check($release, $force = FALSE, $limit = 0, $language = NULL, $cron = FALSE) {
+   $check_languages = isset($language) ? array($language->language => $language) : l10n_community_get_languages();
+@@ -168,8 +169,7 @@ function l10n_packager_release_package($release, $language, $file = NULL, $times
+  * @param $languages
+  *   Array of language codes to repackage or none.
+  *
+- * @return
+- *   Batch array.
++ * @return array Batch.
+  */
+ function l10n_packager_release_batch($rid, $languages = NULL) {
+   $rids = is_array($rid) ? $rid : array($rid);
+diff --git a/l10n_packager/l10n_packager.module b/l10n_packager/l10n_packager.module
+index af485f5..144818f 100644
+--- a/l10n_packager/l10n_packager.module
++++ b/l10n_packager/l10n_packager.module
+@@ -74,10 +74,19 @@ function l10n_packager_menu() {
+  */
+ function l10n_packager_cron() {
+   if (variable_get('l10n_packager_cron', 0)) {
+-    l10n_packager_check_updates();
++    $result = l10n_packager_check_updates();
++    if (isset($result['rids']) && !empty($result['rids'])) {
++      l10n_packager_batch_translations($result['rids']);
++    }
+   }
+ }
+ 
++function l10n_packager_batch_translations($rids) {
++  $batch = l10n_packager_release_batch($rids);
++  batch_set($batch);
++  batch_process(NULL);
++}
++
+ /**
+  * Check releases that need repackaging.
+  */
+@@ -90,7 +99,7 @@ function l10n_packager_check_updates() {
+ 
+     timer_start('l10n_packager');
+     module_load_include('inc', 'l10n_packager');
+-    $timestamp = REQUEST_TIME - $interval;
++    $timestamp = REQUEST_TIME; // - $interval;
+     $file_limit = variable_get('l10n_packager_file_limit', 1);
+     $count_files = $count_check = 0;
+ 
+@@ -103,8 +112,10 @@ function l10n_packager_check_updates() {
+                  OR (pr.status = :status AND (pr.checked < :checked OR pr.updated < :updated))
+               ORDER BY pr.checked";
+     $result = db_query_range($query, 0, variable_get('l10n_packager_release_limit', 10),
+-              array(':status' => L10N_PACKAGER_ACTIVE, ':checked' => $timestamp, ':updated' => $timestamp));
++      array(':status' => L10N_PACKAGER_ACTIVE, ':checked' => $timestamp, ':updated' => $timestamp));
++    $rids = array();
+     while ((!$file_limit || $file_limit > $count_files) && ($release = $result->fetchObject())) {
++      $rids[] = $release->rid;
+       $updates = l10n_packager_release_check($release, FALSE, $file_limit - $count_files, NULL, TRUE);
+       $count_files += count($updates);
+       $count_check++;
+@@ -115,7 +126,7 @@ function l10n_packager_check_updates() {
+     watchdog('l10n_packager', '@ms ms for %checked releases/%repack files.', array('%checked' => $count_check, '%repack' => $count_files, '@ms' => $time));
+   }
+ 
+-  return array($count_check, $count_files, $time);
++  return array($count_check, $count_files, $time, 'rids' => $rids);
+ }
+ 
+ /**
+@@ -302,10 +313,10 @@ function l10n_packager_build_download_links($uri) {
+     foreach ($paths as $path => $dummy) {
+       list($core, $name) = explode('/', $path);
+       $list[] = array('data' => array(
+-                  '#type' => 'link',
+-                  '#title' => t('Translations for @core_version', array('@core_version' => $core)),
+-                  '#href' =>  $url . '/' . $path,
+-                ));
++        '#type' => 'link',
++        '#title' => t('Translations for @core_version', array('@core_version' => $core)),
++        '#href' => $url . '/' . $path,
++      ));
+     }
+ 
+     $rendered = count($list) ? theme('item_list', array('items' => $list)) : t('No downloads available for this project.');
+@@ -433,10 +444,10 @@ function l10n_packager_project_downloads($project, $language, $summary = FALSE,
+       'class' => array('l10n-packager-detail l10n-packager-detail-' . $uri_class),
+       'data' => array(
+         array('data' => array(
+-            '#type' => 'link',
+-            '#title' => $project->title,
+-            '#href' => 'translate/projects/' . $project->uri,
+-          )),
++          '#type' => 'link',
++          '#title' => $project->title,
++          '#href' => 'translate/projects/' . $project->uri,
++        )),
+         $latest_item->title,
+         array(
+           'data' => array(
+diff --git a/l10n_remote/l10n_remote.info b/l10n_remote/l10n_remote.info
+index 47d53c4..3dc5cf4 100644
+--- a/l10n_remote/l10n_remote.info
++++ b/l10n_remote/l10n_remote.info
+@@ -4,6 +4,8 @@ dependencies[] = l10n_community
+ package = "Localization server"
+ core = 7.x
+ 
++files[] = tests/l10n_remote.test
++
+ ; Information added by drupal.org packaging script on 2012-10-31
+ version = "7.x-1.x-dev"
+ core = "7.x"
 diff --git a/l10n_remote/l10n_remote.module b/l10n_remote/l10n_remote.module
-index f36b4d0..ff218ae 100644
+index f36b4d0..784cdaf 100644
 --- a/l10n_remote/l10n_remote.module
 +++ b/l10n_remote/l10n_remote.module
 @@ -88,7 +88,7 @@ function l10n_remote_xmlrpc() {
@@ -154,12 +367,15 @@ index f36b4d0..ff218ae 100644
        t('Handle remote string submissions.'),
      ),
    );
-@@ -119,18 +119,18 @@ function l10n_remote_xmlrpc_status($version) {
+@@ -119,18 +119,21 @@ function l10n_remote_xmlrpc_status($version) {
  /**
   * XML-RPC callback to submit strings remotely.
   */
 -function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid, $client_token, $signature) {
 +function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid, $client_token, $signature, $context, $project) {
++  //mmj - Only for testing  - should be removed in production
++  //$content = serialize(array('langcode' => $langcode, 'source' => $source, 'translation' => $translation, 'uid' => $uid, 'client_token' => $client_token, 'signature' => $signature, 'context' => $context, 'project' => $project));
++  //file_save_data($content, "public://translation_en_da.txt");
  
    // Check signature and permission parameters.
    if (!($uid && $signature == md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $translation . $client_token))) {
@@ -176,7 +392,7 @@ index f36b4d0..ff218ae 100644
      return array('status' => FALSE, 'reason' => 'Empty translations are not saved.');
    }
  
-@@ -139,14 +139,14 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
+@@ -139,14 +142,14 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
    // To return a single user object, wrap "user_load_multiple" with "array_shift" or equivalent.
    // Example: array_shift(user_load_multiple(array(), $uid))
    if (!(($account = user_load($uid)) && $account->status && user_access('access localization community', $account) && user_access('submit suggestions remotely', $account))) {
@@ -193,7 +409,7 @@ index f36b4d0..ff218ae 100644
      return array('status' => FALSE, 'reason' => 'Language not accepted.');
    }
  
-@@ -160,7 +160,7 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
+@@ -160,7 +163,7 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
  
    // Check if the user has permission to submit strings in this language.
    if (!user_access('submit suggestions', $account)) {
@@ -202,7 +418,7 @@ index f36b4d0..ff218ae 100644
      return array('status' => FALSE, 'reason' => 'Not allowed to submit translations in this language.');
    }
  
-@@ -168,25 +168,89 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
+@@ -168,25 +171,96 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
    // @todo: add context support as soon as l10n_client starts to support it!
    // @todo: append $context to $source in MD5 counting when available.
    $select = db_select('l10n_server_string', 's')->fields('s', array('sid'))
@@ -213,24 +429,26 @@ index f36b4d0..ff218ae 100644
 -    //watchdog('l10n_community', 'Source string does not exist on server.', NULL, WATCHDOG_WARNING);
 -    return array('status' => FALSE, 'reason' => 'Source string not found on server, translation not saved.');
 +    watchdog('l10n_community', 'Source string does not exist on server.', array(), WATCHDOG_WARNING);
-+    if($project) {
++    if (!empty($project)) {
 +      $asoc = dbc_l10n_remote_add_string($source, $context, $project);
 +
-+      if(isset($asoc['error'])){
++      if (isset($asoc['error'])) {
 +        watchdog('l10n_community', 'Project %project could not be found on the server.', array('%project' => $project), WATCHDOG_ERROR);
 +        return array('status' => FALSE, 'reason' => $asoc['error'] . ', translation not saved.');
 +      }
-+
 +      $sid = $asoc['sid'];
-+      $pid = $asoc['pid'];
-+      $sel = db_select('l10n_server_project', 'p')->fields('p', array('accept_suggestions'))
-+        ->condition('pid', $pid);
-+      $accept_suggestions = $sel->execute()->fetchField();
++      watchdog('l10n_community', 'An unknown string, %source, was added to the project %project', array('%source' => $source, '%project' => $project), WATCHDOG_INFO);
 +    }
 +    else {
 +      watchdog('l10n_community', 'Source string was NOT saved as a new string.', array(), WATCHDOG_ERROR);
 +      return array('status' => FALSE, 'reason' => 'Source string not found on server, translation not saved.');
 +    }
++  }
++
++  $accept_suggestions = 0;
++  if(!empty($project)){
++    $accept_suggestions = db_select('l10n_server_project', 'p')->fields('p', array('accept_suggestions'))
++      ->condition('uri', $project)->execute()->fetchField();
    }
  
    // Attempt to add this as a suggestion.
@@ -249,8 +467,9 @@ index f36b4d0..ff218ae 100644
    }
  
    // If we got this far, everything is fine. Signal success to the client.
-   return array('status' => TRUE, 'sid' => $sid);
- }
+-  return array('status' => TRUE, 'sid' => $sid);
++  return array('status' => TRUE, 'sid' => $sid, 'tid' => $tid);
++}
 +
 +/**
 + * If source doesn't exsist already it will be added to db
@@ -265,8 +484,8 @@ index f36b4d0..ff218ae 100644
 + * @internal param String $signature
 + * @return Array
 + */
-+function dbc_l10n_remote_add_string($source,$context, $project) {
-+  module_load_include('module', 'l10n_gettext');
++function dbc_l10n_remote_add_string($source, $context, $project) {
++
 +  $value = array(
 +    'msgid' => $source,
 +    'msgctxt' => $context,
@@ -277,8 +496,8 @@ index f36b4d0..ff218ae 100644
 +    ->execute()
 +    ->fetchField();
 +
-+  if(!$pid){
-+    return array('error' => t('Project "@project" doesn\'t exist on server', array('@project' => $project)) );
++  if (!$pid) {
++    return array('error' => t('Project "@project" doesn\'t exist on server', array('@project' => $project)));
 +  }
 +
 +  $rid = db_select('l10n_server_release', 'r')->fields('r', array('rid'))
@@ -287,17 +506,256 @@ index f36b4d0..ff218ae 100644
 +    ->execute()
 +    ->fetchField();
 +
++  if (!$rid) {
++    return array('error' => t('No release associated with project "@project"', array('@project' => $project)));
++  }
++
 +  $fid = db_select('l10n_server_file', 'f')->fields('f', array('fid'))
 +    ->condition('pid', $pid)
 +    ->condition('rid', $rid)
 +    ->execute()
 +    ->fetchField();
 +
++  module_load_include('module', 'l10n_gettext');
 +  $sid = l10n_gettext_store_string($value, $pid, $rid, $fid);
 +  watchdog('l10n_community', 'Source string was saved as a new string.', array(), WATCHDOG_INFO);
 +
 +  return array('sid' => $sid, 'pid' => $pid);
+ }
+diff --git a/l10n_remote/tests/l10n_remote.test b/l10n_remote/tests/l10n_remote.test
+new file mode 100644
+index 0000000..736f319
+--- /dev/null
++++ b/l10n_remote/tests/l10n_remote.test
+@@ -0,0 +1,213 @@
++<?php
++/**
++ * Author: Martin Møller
++ */
++class L10nRemoteTest extends DrupalWebTestCase {
++
++  private $translation_request;
++
++  public static function getInfo() {
++    return array(
++      'name' => t('L10n Remote'),
++      'description' => t('Ensure that the L10n Remote functions properly.'),
++      'group' => t('Localization server'),
++    );
++  }
++
++  public function setUp() {
++    //Setup and load needed modules and files
++    parent::setUp('l10n_remote', 'l10n_server', 'l10n_gettext');
++    module_load_include('module', 'l10n_remote');
++    module_load_include('inc', 'l10n_server', 'l10n_server.projects');
++
++    //Create the users we will use in this test
++    $this->u_translater_1 = $this->drupalCreateUser(array('access localization community', 'submit suggestions remotely'));
++    $this->u_translater_2 = $this->drupalCreateUser(array('access localization community', 'submit suggestions remotely', 'submit suggestions'));
++
++    //Create a project on the server for test purpuse ("testproject")
++    //Load form_state mockup
++    $project_form_state = unserialize(file_get_contents(drupal_get_path('module', 'l10n_remote') . '/tests/mockups/form_state_add_project_submit.txt'));
++    l10n_server_admin_projects_edit_form_submit(array(), $project_form_state);
++
++    //Load translation request
++    $this->translation_request = unserialize(file_get_contents(drupal_get_path('module', 'l10n_remote') . '/tests/mockups/translation_en_da.txt'));
++
++    //Adding values to db
++    //Add language da to databse
++    db_insert('languages')
++      ->fields(array(
++      'language' => 'da',
++      'name' => 'Danish',
++      'native' => 'Dansk',
++      'direction' => 0,
++      'enabled' => 1,
++      'plurals' => 0,
++      'prefix' => 'da',
++      'weight' => 0,
++    ))
++      ->execute();
++
++    //Adding a release
++    db_insert('l10n_server_release')
++      ->fields(array(
++      'rid' => 1,
++      'pid' => 1,
++      'title' => '7.x-0.1',
++      'download_link' => '',
++      'last_parsed' => 0,
++      'weight' => 0,
++      'sid_count' => 0,
++    ))
++      ->execute();
++
++    //Addind a file
++    db_insert('l10n_server_file')
++      ->fields(array(
++      'fid' => 1,
++      'pid' => 1,
++      'rid' => 1,
++      'location' => 'init.po',
++      'revision' => '',
++    ))
++      ->execute();
++  }
++
++  /**
++   * Testing the method l10n_remote_xmlrpc_string_submit in l10n_remote.module.
++   * The method receives submissions from the l10n_client and returns an appropriate answer to the client.
++   *
++   * @see l10n_remote_xmlrpc_string_submit()
++   * @see l10n_remote.module
++   */
++  public function testStringSubmission() {
++    $this->drupalLogin($this->u_translater_1);
++
++    //Test for wrong parameteres
++    $uid = $this->translation_request['uid'];
++    $uid = $this->loggedInUser->uid;
++    $client_token = $this->translation_request['client_token'];
++    $langcode = $this->translation_request['langcode'];
++    $source = $this->translation_request['source'];
++    $translation = $this->translation_request['translation'];
++    $signature = $this->translation_request['signature'];
++    $context = $this->translation_request['context'];
++    $project = $this->translation_request['project'];
++
++    $resp = $this->_submitTranslation($langcode, $source, $translation, $uid, $client_token, $signature, $context, $project);
++    $this->assertEqual($resp['reason'], 'Wrong parameters or signature. Did you set your user API key on your user account page?', t('Response: %response', array('%response' => $resp['reason'])));
++
++    //Test for empty translation. Empty translations should not be accepted
++    $fake_translation = '';
++    $fake_signature = md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $fake_translation . $client_token);
++    $resp = $this->_submitTranslation($langcode, $source, $fake_translation, $uid, $client_token, $fake_signature, $context, $project);
++    $this->assertEqual($resp['reason'], 'Empty translations are not saved.', t('Response: %response', array('%response' => $resp['reason'])));
++
++    //test for unauthorized account used for submission
++    $fake_uid = 50;
++    $fake_signature = md5(l10n_remote_user_api_key($fake_uid, $client_token) . $langcode . $source . $translation . $client_token);
++    $resp = $this->_submitTranslation($langcode, $source, $translation, $fake_uid, $client_token, $fake_signature, $context, $project);
++    $this->assertEqual($resp['reason'], 'Blocked user account or no permission to submit translations.', t('Response: %response', array('%response' => $resp['reason'])));
++
++    //test for not accepted language
++    $fake_langcode = 'de';
++    $fake_signature = md5(l10n_remote_user_api_key($uid, $client_token) . $fake_langcode . $source . $translation . $client_token);
++    $resp = $this->_submitTranslation($fake_langcode, $source, $translation, $uid, $client_token, $fake_signature, $context, $project);
++    $this->assertEqual($resp['reason'], 'Language not accepted.', t('Response: %response', array('%response' => $resp['reason'])));
++
++    //test for user without permission to submit translations
++    $fake_signature = md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $translation . $client_token);
++    $resp = $this->_submitTranslation($langcode, $source, $translation, $uid, $client_token, $fake_signature, $context, $project);
++    $this->assertEqual($resp['reason'], 'Not allowed to submit translations in this language.', t('Response: %response', array('%response' => $resp['reason'])));
++
++    //test for submission of translations for unknown projects
++    $this->drupalLogin($this->u_translater_2);
++    $uid = $this->loggedInUser->uid;
++
++    $fake_project = 'fake_project';
++    $fake_signature = md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $translation . $client_token);
++    $resp = $this->_submitTranslation($langcode, $source, $translation, $uid, $client_token, $fake_signature, $context, $fake_project);
++    $this->assertEqual($resp['reason'], 'Project "fake_project" doesn\'t exist on server, translation not saved.', t('Response: %response', array('%response' => $resp['reason'])));
++
++    //testing rejection of string - happens if source string is unknown and the $project varitable is undefined
++    $fake_project = '';
++    $fake_signature = md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $translation . $client_token);
++    $resp = $this->_submitTranslation($langcode, $source, $translation, $uid, $client_token, $fake_signature, $context, $fake_project);
++    $this->assertEqual($resp['reason'], 'Source string not found on server, translation not saved.', t('Response: %response', array('%response' => $resp['reason'])));
++
++    //test submission of unknown string to a known project - should be accepted
++    $project = 'test_project';
++    $fake_signature = md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $translation . $client_token);
++    $resp = $this->_submitTranslation($langcode, $source, $translation, $uid, $client_token, $fake_signature, $context, $project);
++    $this->assertTrue($resp['status'], t('Unknown string was saved with id: %sid', array('%sid' => $resp['sid'])));
++
++    //as long as suggestions are approved on the project, submitting the same string should not spawn an error
++    #$project = 'test_project';
++    $fake_signature = md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $translation . $client_token);
++    $resp = $this->_submitTranslation($langcode, $source, $translation, $uid, $client_token, $fake_signature, $context, $project);
++    $this->assertTrue($resp['status'], t('Unknown string was saved with id: %sid', array('%sid' => $resp['sid'])));
++
++    //setting the accept_suggestions value to 0 on the project should spawn an error when submitting an already active translations
++    db_update('l10n_server_project')->fields(array('accept_suggestions' => 0))->execute();
++
++    $project = 'test_project';
++    $fake_signature = md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $translation . $client_token);
++    $resp = $this->_submitTranslation($langcode, $source, $translation, $uid, $client_token, $fake_signature, $context, $project);
++    $this->assertEqual($resp['reason'], 'Suggested translation already appears as active translation or suggestion.', t('Response: %response', array('%response' => $resp['reason'])));
++  }
++
++  /**
++   * Test of method dbc_l10n_remote_add_string().
++   *
++   * @see dbc_l10n_remote_add_string()
++   * @see l10n_remote.module
++   */
++  public function testAddingNewString(){
++    //create fake project that have no associated release
++    db_insert('l10n_server_project')
++      ->fields(array(
++      'pid' => 10,
++      'uri' => 'fake_project',
++      'title' => 'Fake Project',
++      'home_link' => '',
++      'last_parsed' => NULL,
++      'connector_module' => 'l10n_gettext_uploads',
++      'status' => 1,
++      'weight' => 0,
++      'accept_suggestions' => 0,
++    ))
++      ->execute();
++
++    //test submission to unknown project
++    $unknown_project = 'unknown project';
++    $response = dbc_l10n_remote_add_string($this->translation_request['source'], $this->translation_request['context'], $unknown_project);
++    $this->assertNotNull($response['error'], 'Error message is present');
++    $this->assertEqual($response['error'], 'Project "unknown project" doesn\'t exist on server');
++
++    //test submission to a known project without an associated release
++    $fake_project = 'fake_project';
++    $response = dbc_l10n_remote_add_string($this->translation_request['source'], $this->translation_request['context'], $fake_project);
++    $this->assertNotNull($response['error'], 'Error message is present');
++    $this->assertEqual($response['error'], 'No release associated with project "fake_project"');
++
++    //test succesful submission of string
++    $response = dbc_l10n_remote_add_string($this->translation_request['source'], $this->translation_request['context'], $this->translation_request['project']);
++    $this->assertNotNull($response['sid'], 'sid present');
++    $this->assertNotNull($response['pid'], 'pid present');
++  }
++
++  /**
++   * @param String $langcode
++   * @param String $translation
++   * @param String $source
++   * @param String $uid
++   * @param String $client_token
++   * @param String $signature
++   * @param String $context
++   * @param String $project
++   * @return array Response
++   */
++  private function _submitTranslation($langcode, $source, $translation, $uid, $client_token, $signature, $context, $project) {
++    $response = l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid, $client_token, $signature, $context, $project);
++    return $response;
++  }
 +}
+diff --git a/l10n_remote/tests/mockups/form_state_add_project_submit.txt b/l10n_remote/tests/mockups/form_state_add_project_submit.txt
+new file mode 100644
+index 0000000..2e53bfd
+--- /dev/null
++++ b/l10n_remote/tests/mockups/form_state_add_project_submit.txt
+@@ -0,0 +1 @@
++a:19:{s:10:"build_info";a:3:{s:4:"args";a:0:{}s:7:"form_id";s:36:"l10n_server_admin_projects_edit_form";s:5:"files";a:1:{s:4:"menu";s:66:"sites/all/modules/l10n_server/l10n_server/l10n_server.projects.inc";}}s:9:"temporary";a:0:{}s:10:"programmed";b:0;s:5:"cache";b:0;s:14:"admin_menu_uid";N;s:7:"rebuild";b:0;s:12:"rebuild_info";a:0:{}s:8:"redirect";N;s:9:"submitted";b:1;s:8:"executed";b:0;s:6:"method";s:4:"post";s:6:"groups";a:0:{}s:7:"buttons";a:1:{i:0;a:19:{s:5:"#type";s:6:"submit";s:6:"#value";s:12:"Save project";s:6:"#input";b:1;s:5:"#name";s:2:"op";s:12:"#button_type";s:6:"submit";s:25:"#executes_submit_callback";b:1;s:24:"#limit_validation_errors";b:0;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:15:"#theme_wrappers";a:1:{i:0;s:6:"button";}s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:6:"submit";}s:14:"#array_parents";a:1:{i:0;s:6:"submit";}s:7:"#weight";d:0.007000000000000000145716771982051795930601656436920166015625;s:10:"#processed";b:0;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:3:"#id";s:11:"edit-submit";}}s:5:"input";a:10:{s:3:"uri";s:12:"test_project";s:5:"title";s:12:"Test Project";s:9:"home_link";s:0:"";s:16:"connector_module";s:20:"l10n_gettext_uploads";s:6:"weight";s:1:"0";s:18:"accept_suggestions";s:1:"1";s:2:"op";s:12:"Save project";s:13:"form_build_id";s:48:"form-Mq9kl2vz3DHDuLSN8TYEbI4VMWsYgoggIYyxJO0TnK8";s:10:"form_token";s:43:"TgaiIWYDEns7I6Oh9x4BEe-D-Ccdf4GPAfqszoeiN3Q";s:7:"form_id";s:36:"l10n_server_admin_projects_edit_form";}s:6:"values";a:12:{s:16:"previous_project";O:8:"stdClass":7:{s:3:"pid";N;s:3:"uri";s:0:"";s:5:"title";s:0:"";s:9:"home_link";s:0:"";s:16:"connector_module";s:20:"l10n_gettext_uploads";s:6:"status";i:1;s:6:"weight";i:0;}s:3:"uri";s:12:"test_project";s:5:"title";s:12:"Test Project";s:9:"home_link";s:0:"";s:16:"connector_module";s:20:"l10n_gettext_uploads";s:6:"weight";s:1:"0";s:18:"accept_suggestions";i:1;s:6:"submit";s:12:"Save project";s:13:"form_build_id";s:48:"form-vcs1julu1PWk2WIRWsgujl49KMjtudC1sngZBM00UnY";s:10:"form_token";s:43:"TgaiIWYDEns7I6Oh9x4BEe-D-Ccdf4GPAfqszoeiN3Q";s:7:"form_id";s:36:"l10n_server_admin_projects_edit_form";s:2:"op";s:12:"Save project";}s:13:"complete form";a:32:{s:16:"previous_project";a:16:{s:5:"#type";s:5:"value";s:6:"#value";r:55;s:6:"#input";b:1;s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:16:"previous_project";}s:14:"#array_parents";a:1:{i:0;s:16:"previous_project";}s:7:"#weight";i:0;s:10:"#processed";b:0;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:3:"#id";s:21:"edit-previous-project";s:5:"#name";s:16:"previous_project";s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:3:"uri";a:27:{s:5:"#type";s:9:"textfield";s:6:"#title";s:11:"Project URI";s:12:"#description";s:144:"Short name of project used in paths. This will appear in paths like <em>translate/projects/uri</em> at the end. Suggested to use lowercase only.";s:14:"#default_value";s:0:"";s:9:"#required";b:1;s:6:"#input";b:1;s:5:"#size";i:60;s:10:"#maxlength";i:128;s:18:"#autocomplete_path";b:0;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:6:"#theme";s:9:"textfield";s:15:"#theme_wrappers";a:1:{i:0;s:12:"form_element";}s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:3:"uri";}s:14:"#array_parents";a:1:{i:0;s:3:"uri";}s:7:"#weight";d:0.001000000000000000020816681711721685132943093776702880859375;s:10:"#processed";b:1;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:3:"#id";s:8:"edit-uri";s:5:"#name";s:3:"uri";s:6:"#value";s:12:"test_project";s:17:"#needs_validation";b:1;s:15:"#ajax_processed";b:0;s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:5:"title";a:27:{s:5:"#type";s:9:"textfield";s:6:"#title";s:12:"Project name";s:12:"#description";s:31:"Human readable name of project.";s:14:"#default_value";s:0:"";s:9:"#required";b:1;s:6:"#input";b:1;s:5:"#size";i:60;s:10:"#maxlength";i:128;s:18:"#autocomplete_path";b:0;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:6:"#theme";s:9:"textfield";s:15:"#theme_wrappers";a:1:{i:0;s:12:"form_element";}s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:5:"title";}s:14:"#array_parents";a:1:{i:0;s:5:"title";}s:7:"#weight";d:0.00200000000000000004163336342344337026588618755340576171875;s:10:"#processed";b:1;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:3:"#id";s:10:"edit-title";s:5:"#name";s:5:"title";s:6:"#value";s:12:"Test Project";s:17:"#needs_validation";b:1;s:15:"#ajax_processed";b:0;s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:9:"home_link";a:27:{s:5:"#type";s:9:"textfield";s:6:"#title";s:9:"Home link";s:12:"#description";s:57:"Link to home page of project, displayed on project pages.";s:14:"#default_value";s:0:"";s:6:"#input";b:1;s:5:"#size";i:60;s:10:"#maxlength";i:128;s:18:"#autocomplete_path";b:0;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:6:"#theme";s:9:"textfield";s:15:"#theme_wrappers";a:1:{i:0;s:12:"form_element";}s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:9:"home_link";}s:14:"#array_parents";a:1:{i:0;s:9:"home_link";}s:7:"#weight";d:0.003000000000000000062450045135165055398829281330108642578125;s:10:"#processed";b:1;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:3:"#id";s:14:"edit-home-link";s:5:"#name";s:9:"home_link";s:6:"#value";s:0:"";s:17:"#needs_validation";b:1;s:15:"#ajax_processed";b:0;s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:16:"connector_module";a:25:{s:5:"#type";s:6:"radios";s:6:"#title";s:31:"Connector handling project data";s:12:"#description";s:67:"Data and source handler for this project. Cannot be modified later.";s:8:"#options";a:1:{s:20:"l10n_gettext_uploads";s:31:"Gettext files from file uploads";}s:14:"#default_value";s:20:"l10n_gettext_uploads";s:9:"#disabled";b:0;s:6:"#input";b:1;s:8:"#process";a:1:{i:0;s:19:"form_process_radios";}s:15:"#theme_wrappers";a:1:{i:0;s:6:"radios";}s:11:"#pre_render";a:1:{i:0;s:40:"form_pre_render_conditional_form_element";}s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:16:"connector_module";}s:14:"#array_parents";a:1:{i:0;s:16:"connector_module";}s:7:"#weight";d:0.0040000000000000000832667268468867405317723751068115234375;s:10:"#processed";b:1;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:3:"#id";s:21:"edit-connector-module";s:5:"#name";s:16:"connector_module";s:6:"#value";s:20:"l10n_gettext_uploads";s:17:"#needs_validation";b:1;s:20:"l10n_gettext_uploads";a:26:{s:5:"#type";s:5:"radio";s:6:"#title";s:31:"Gettext files from file uploads";s:13:"#return_value";s:20:"l10n_gettext_uploads";s:14:"#default_value";s:20:"l10n_gettext_uploads";s:11:"#attributes";a:0:{}s:8:"#parents";a:1:{i:0;s:16:"connector_module";}s:3:"#id";s:42:"edit-connector-module-l10n-gettext-uploads";s:5:"#ajax";N;s:7:"#weight";d:0.001000000000000000020816681711721685132943093776702880859375;s:6:"#input";b:1;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:6:"#theme";s:5:"radio";s:15:"#theme_wrappers";a:1:{i:0;s:12:"form_element";}s:14:"#title_display";s:5:"after";s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:9:"#disabled";b:0;s:14:"#array_parents";a:2:{i:0;s:16:"connector_module";i:1;s:20:"l10n_gettext_uploads";}s:10:"#processed";b:1;s:9:"#required";b:0;s:5:"#name";s:16:"connector_module";s:6:"#value";s:20:"l10n_gettext_uploads";s:17:"#needs_validation";b:1;s:15:"#ajax_processed";b:0;s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:10:"#validated";b:1;}s:6:"weight";a:27:{s:5:"#type";s:9:"textfield";s:6:"#title";s:6:"Weight";s:12:"#description";s:73:"Weight of the project. Lighter projects float up when ordering by weight.";s:14:"#default_value";i:0;s:6:"#input";b:1;s:5:"#size";i:60;s:10:"#maxlength";i:128;s:18:"#autocomplete_path";b:0;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:6:"#theme";s:9:"textfield";s:15:"#theme_wrappers";a:1:{i:0;s:12:"form_element";}s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:6:"weight";}s:14:"#array_parents";a:1:{i:0;s:6:"weight";}s:7:"#weight";d:0.005000000000000000104083408558608425664715468883514404296875;s:10:"#processed";b:1;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:3:"#id";s:11:"edit-weight";s:5:"#name";s:6:"weight";s:6:"#value";s:1:"0";s:17:"#needs_validation";b:1;s:15:"#ajax_processed";b:0;s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:18:"accept_suggestions";a:26:{s:5:"#type";s:8:"checkbox";s:6:"#title";s:20:"Override suggestions";s:12:"#description";s:112:"Should this project accepts submissions right away? If checked incoming translations will be accepted right away";s:14:"#default_value";b:0;s:6:"#input";b:1;s:13:"#return_value";i:1;s:6:"#theme";s:8:"checkbox";s:8:"#process";a:2:{i:0;s:21:"form_process_checkbox";i:1;s:17:"ajax_process_form";}s:15:"#theme_wrappers";a:1:{i:0;s:12:"form_element";}s:14:"#title_display";s:5:"after";s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:18:"accept_suggestions";}s:14:"#array_parents";a:1:{i:0;s:18:"accept_suggestions";}s:7:"#weight";d:0.00600000000000000012490009027033011079765856266021728515625;s:10:"#processed";b:1;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:3:"#id";s:23:"edit-accept-suggestions";s:5:"#name";s:18:"accept_suggestions";s:6:"#value";i:1;s:17:"#needs_validation";b:1;s:8:"#checked";b:1;s:15:"#ajax_processed";b:0;s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:6:"submit";a:22:{s:5:"#type";s:6:"submit";s:6:"#value";s:12:"Save project";s:6:"#input";b:1;s:5:"#name";s:2:"op";s:12:"#button_type";s:6:"submit";s:25:"#executes_submit_callback";b:1;s:24:"#limit_validation_errors";b:0;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:15:"#theme_wrappers";a:1:{i:0;s:6:"button";}s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:6:"submit";}s:14:"#array_parents";a:1:{i:0;s:6:"submit";}s:7:"#weight";d:0.007000000000000000145716771982051795930601656436920166015625;s:10:"#processed";b:1;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:3:"#id";s:11:"edit-submit";s:15:"#ajax_processed";b:0;s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:8:"#form_id";s:36:"l10n_server_admin_projects_edit_form";s:5:"#type";s:4:"form";s:9:"#build_id";s:48:"form-vcs1julu1PWk2WIRWsgujl49KMjtudC1sngZBM00UnY";s:13:"form_build_id";a:19:{s:5:"#type";s:6:"hidden";s:6:"#value";s:48:"form-vcs1julu1PWk2WIRWsgujl49KMjtudC1sngZBM00UnY";s:3:"#id";s:48:"form-vcs1julu1PWk2WIRWsgujl49KMjtudC1sngZBM00UnY";s:5:"#name";s:13:"form_build_id";s:8:"#parents";a:1:{i:0;s:13:"form_build_id";}s:6:"#input";b:1;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:6:"#theme";s:6:"hidden";s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:14:"#array_parents";a:1:{i:0;s:13:"form_build_id";}s:7:"#weight";d:0.008000000000000000166533453693773481063544750213623046875;s:10:"#processed";b:1;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:15:"#ajax_processed";b:0;s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:6:"#token";s:36:"l10n_server_admin_projects_edit_form";s:10:"form_token";a:19:{s:3:"#id";s:52:"edit-l10n-server-admin-projects-edit-form-form-token";s:5:"#type";s:5:"token";s:14:"#default_value";s:43:"TgaiIWYDEns7I6Oh9x4BEe-D-Ccdf4GPAfqszoeiN3Q";s:8:"#parents";a:1:{i:0;s:10:"form_token";}s:6:"#input";b:1;s:6:"#theme";s:6:"hidden";s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:14:"#array_parents";a:1:{i:0;s:10:"form_token";}s:7:"#weight";d:0.00899999999999999931998839741709161899052560329437255859375;s:10:"#processed";b:0;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:5:"#name";s:10:"form_token";s:6:"#value";s:43:"TgaiIWYDEns7I6Oh9x4BEe-D-Ccdf4GPAfqszoeiN3Q";s:17:"#needs_validation";b:1;s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:7:"form_id";a:19:{s:5:"#type";s:6:"hidden";s:6:"#value";s:36:"l10n_server_admin_projects_edit_form";s:3:"#id";s:41:"edit-l10n-server-admin-projects-edit-form";s:8:"#parents";a:1:{i:0;s:7:"form_id";}s:6:"#input";b:1;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:6:"#theme";s:6:"hidden";s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:14:"#array_parents";a:1:{i:0;s:7:"form_id";}s:7:"#weight";d:0.01000000000000000020816681711721685132943093776702880859375;s:10:"#processed";b:1;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:5:"#name";s:7:"form_id";s:15:"#ajax_processed";b:0;s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:3:"#id";s:36:"l10n-server-admin-projects-edit-form";s:7:"#method";s:4:"post";s:7:"#action";s:74:"/local_server/admin/l10n_server/projects/add?render=overlay&render=overlay";s:15:"#theme_wrappers";a:1:{i:0;s:4:"form";}s:5:"#tree";b:0;s:8:"#parents";a:0:{}s:9:"#validate";a:1:{i:0;s:45:"l10n_server_admin_projects_edit_form_validate";}s:7:"#submit";a:1:{i:0;s:43:"l10n_server_admin_projects_edit_form_submit";}s:6:"#theme";a:1:{i:0;s:36:"l10n_server_admin_projects_edit_form";}s:10:"#processed";b:0;s:16:"#defaults_loaded";b:1;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:14:"#array_parents";a:0:{}s:7:"#sorted";b:1;s:10:"#validated";b:1;}s:13:"process_input";b:1;s:18:"triggering_element";a:19:{s:5:"#type";s:6:"submit";s:6:"#value";s:12:"Save project";s:6:"#input";b:1;s:5:"#name";s:2:"op";s:12:"#button_type";s:6:"submit";s:25:"#executes_submit_callback";b:1;s:24:"#limit_validation_errors";b:0;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:15:"#theme_wrappers";a:1:{i:0;s:6:"button";}s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:6:"submit";}s:14:"#array_parents";a:1:{i:0;s:6:"submit";}s:7:"#weight";d:0.007000000000000000145716771982051795930601656436920166015625;s:10:"#processed";b:0;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:3:"#id";s:11:"edit-submit";}s:14:"clicked_button";a:19:{s:5:"#type";s:6:"submit";s:6:"#value";s:12:"Save project";s:6:"#input";b:1;s:5:"#name";s:2:"op";s:12:"#button_type";s:6:"submit";s:25:"#executes_submit_callback";b:1;s:24:"#limit_validation_errors";b:0;s:8:"#process";a:1:{i:0;s:17:"ajax_process_form";}s:15:"#theme_wrappers";a:1:{i:0;s:6:"button";}s:16:"#defaults_loaded";b:1;s:5:"#tree";b:0;s:8:"#parents";a:1:{i:0;s:6:"submit";}s:14:"#array_parents";a:1:{i:0;s:6:"submit";}s:7:"#weight";d:0.007000000000000000145716771982051795930601656436920166015625;s:10:"#processed";b:0;s:9:"#required";b:0;s:11:"#attributes";a:0:{}s:14:"#title_display";s:6:"before";s:3:"#id";s:11:"edit-submit";}}
+\ No newline at end of file
+diff --git a/l10n_remote/tests/mockups/translation_en_da.txt b/l10n_remote/tests/mockups/translation_en_da.txt
+new file mode 100644
+index 0000000..c07b2e4
+--- /dev/null
++++ b/l10n_remote/tests/mockups/translation_en_da.txt
+@@ -0,0 +1 @@
++a:8:{s:8:"langcode";s:2:"da";s:6:"source";s:13:"Configuration";s:11:"translation";s:13:"Konfiguration";s:3:"uid";i:1;s:12:"client_token";s:32:"9bb46bd397fe13f44e328bd288bba7c7";s:9:"signature";s:32:"37cf0d08d9de47e10a3850373d3f7c8e";s:7:"context";s:0:"";s:7:"project";s:12:"test_project";}
 diff --git a/l10n_server/l10n_server.install b/l10n_server/l10n_server.install
 index ddf19eb..5583769 100644
 --- a/l10n_server/l10n_server.install
