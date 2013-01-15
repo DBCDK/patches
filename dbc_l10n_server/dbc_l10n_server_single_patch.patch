@@ -1,5 +1,5 @@
 diff --git a/README.txt b/README.txt
-index c4cf784..4795f24 100644
+index c4cf784..36d98a6 100644
 --- a/README.txt
 +++ b/README.txt
 @@ -1,3 +1,36 @@
@@ -8,22 +8,22 @@ index c4cf784..4795f24 100644
 +This module is a clone of the l10n_server module found on
 +http://drupal.org/project/l10n_server
 +
-+The code is based on the 7.x-1.x-dev version of the module. As the original
-+module currently is in a state of development, code can change without warning
-+why the module has been cloned and put into it's own repository where
-+development has continued to make the module fit with the needs of DBC A/S.
++The code is based on the 7.x-1.x-dev (released oct 31st 2012) version of the
++module. As the original module currently is in a state of development, code can
++change without warning why the module has been cloned and put into it's own
++repository where development has continued to make the module fit with the needs
++of DBC A/S.
 +
 +Features:
 + - Associate l10n_client translations with a specific project on the server
-+ - On project level admin can choose whether to accept accept suggestions
++ - On project level admin can choose whether to accept suggestions
 +   automatically, without manual approval
 + - Strings unknown to the server will be added with the projects specified in
 +   the l10n_client request
 +
 +To take use of the changes made to the module one will need to patch l10n_client
 +with the patch found at:
-+https://raw.github.com/DBCDK/patches/master/dbc_l10n_client/
-+dbc_l10n_client_patch.patch
++https://raw.github.com/DBCDK/patches/master/dbc_l10n_client/dbc_l10n_client_patch.patch
 +
 +Note that this module in general lacks testing. However, if you plan to make
 +any changes should the exsisting tests be run ahead of development as well as
@@ -161,7 +161,7 @@ index f2b1618..a96b619 100644
    else {
      return count($sids);
 diff --git a/l10n_community/l10n_community.module b/l10n_community/l10n_community.module
-index 948e42a..465d668 100644
+index 948e42a..6a68ed0 100644
 --- a/l10n_community/l10n_community.module
 +++ b/l10n_community/l10n_community.module
 @@ -838,10 +838,9 @@ function l10n_community_rebuild_stats() {
@@ -195,7 +195,7 @@ index 948e42a..465d668 100644
 + * @return bool|\DatabaseStatementInterface|int|null
   */
 -function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attribution, $uid_user, $medium) {
-+function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attribution, $uid_user, $medium, $accept_suggestions) {
++function l10n_community_add_suggestion($sid, $translation, $langcode, $uid_attribution, $uid_user, $medium, $accept_suggestions = 0) {
  
    // Load source string and adjust translation whitespace based on source.
    $source_string = db_query('SELECT value FROM {l10n_server_string} WHERE sid = :sid', array(':sid' => $sid))->fetchField();
@@ -355,7 +355,7 @@ index 47d53c4..3dc5cf4 100644
  version = "7.x-1.x-dev"
  core = "7.x"
 diff --git a/l10n_remote/l10n_remote.module b/l10n_remote/l10n_remote.module
-index f36b4d0..784cdaf 100644
+index f36b4d0..65363f5 100644
 --- a/l10n_remote/l10n_remote.module
 +++ b/l10n_remote/l10n_remote.module
 @@ -88,7 +88,7 @@ function l10n_remote_xmlrpc() {
@@ -367,16 +367,13 @@ index f36b4d0..784cdaf 100644
        t('Handle remote string submissions.'),
      ),
    );
-@@ -119,18 +119,21 @@ function l10n_remote_xmlrpc_status($version) {
+@@ -119,18 +119,17 @@ function l10n_remote_xmlrpc_status($version) {
  /**
   * XML-RPC callback to submit strings remotely.
   */
 -function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid, $client_token, $signature) {
+-
 +function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid, $client_token, $signature, $context, $project) {
-+  //mmj - Only for testing  - should be removed in production
-+  //$content = serialize(array('langcode' => $langcode, 'source' => $source, 'translation' => $translation, 'uid' => $uid, 'client_token' => $client_token, 'signature' => $signature, 'context' => $context, 'project' => $project));
-+  //file_save_data($content, "public://translation_en_da.txt");
- 
    // Check signature and permission parameters.
    if (!($uid && $signature == md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $translation . $client_token))) {
 -    //watchdog('l10n_community', 'Submitted translation with wrong parameters or signature.', NULL, WATCHDOG_WARNING);
@@ -392,7 +389,7 @@ index f36b4d0..784cdaf 100644
      return array('status' => FALSE, 'reason' => 'Empty translations are not saved.');
    }
  
-@@ -139,14 +142,14 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
+@@ -139,14 +138,14 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
    // To return a single user object, wrap "user_load_multiple" with "array_shift" or equivalent.
    // Example: array_shift(user_load_multiple(array(), $uid))
    if (!(($account = user_load($uid)) && $account->status && user_access('access localization community', $account) && user_access('submit suggestions remotely', $account))) {
@@ -409,7 +406,7 @@ index f36b4d0..784cdaf 100644
      return array('status' => FALSE, 'reason' => 'Language not accepted.');
    }
  
-@@ -160,7 +163,7 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
+@@ -160,7 +159,7 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
  
    // Check if the user has permission to submit strings in this language.
    if (!user_access('submit suggestions', $account)) {
@@ -418,41 +415,47 @@ index f36b4d0..784cdaf 100644
      return array('status' => FALSE, 'reason' => 'Not allowed to submit translations in this language.');
    }
  
-@@ -168,25 +171,96 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
+@@ -168,25 +167,101 @@ function l10n_remote_xmlrpc_string_submit($langcode, $source, $translation, $uid
    // @todo: add context support as soon as l10n_client starts to support it!
    // @todo: append $context to $source in MD5 counting when available.
    $select = db_select('l10n_server_string', 's')->fields('s', array('sid'))
 -    ->condition('hashkey', md5($source));
 +    ->condition('hashkey', md5($source . $context));
    $sid = $select->execute()->fetchField();
-   if (!$sid) {
+-  if (!$sid) {
 -    //watchdog('l10n_community', 'Source string does not exist on server.', NULL, WATCHDOG_WARNING);
--    return array('status' => FALSE, 'reason' => 'Source string not found on server, translation not saved.');
-+    watchdog('l10n_community', 'Source string does not exist on server.', array(), WATCHDOG_WARNING);
-+    if (!empty($project)) {
-+      $asoc = dbc_l10n_remote_add_string($source, $context, $project);
 +
-+      if (isset($asoc['error'])) {
-+        watchdog('l10n_community', 'Project %project could not be found on the server.', array('%project' => $project), WATCHDOG_ERROR);
-+        return array('status' => FALSE, 'reason' => $asoc['error'] . ', translation not saved.');
-+      }
-+      $sid = $asoc['sid'];
-+      watchdog('l10n_community', 'An unknown string, %source, was added to the project %project', array('%source' => $source, '%project' => $project), WATCHDOG_INFO);
++  if (!$sid && empty($project)) {
++    watchdog('l10n_community', 'Source string was NOT saved as a new string. No project provided to associate with string.', array(), WATCHDOG_ERROR);
+     return array('status' => FALSE, 'reason' => 'Source string not found on server, translation not saved.');
+   }
++  else if (!$sid && !empty($project)) {
++    $asoc = dbc_l10n_remote_add_string($source, $context, $project);
++    if (isset($asoc['error'])) {
++      watchdog('l10n_community', 'Project %project could not be found on the server.', array('%project' => $project), WATCHDOG_ERROR);
++      return array('status' => FALSE, 'reason' => $asoc['error'] . ', translation not saved.');
 +    }
-+    else {
-+      watchdog('l10n_community', 'Source string was NOT saved as a new string.', array(), WATCHDOG_ERROR);
-+      return array('status' => FALSE, 'reason' => 'Source string not found on server, translation not saved.');
++    $sid = $asoc['sid'];
++    watchdog('l10n_community', 'An unknown string, %source, was added to the project %project', array('%source' => $source, '%project' => $project), WATCHDOG_INFO);
++  }
++  else if ($sid && !empty($project)) {
++    $asoc = dbc_l10n_remote_add_string($source, $context, $project);
++    if (isset($asoc['error'])) {
++      watchdog('l10n_community', 'Project %project could not be found on the server.', array('%project' => $project), WATCHDOG_ERROR);
++      return array('status' => FALSE, 'reason' => $asoc['error'] . ', translation not saved.');
 +    }
++    watchdog('l10n_community', 'An unknown string, %source, was added to the project %project', array('%source' => $source, '%project' => $project), WATCHDOG_INFO);
 +  }
 +
 +  $accept_suggestions = 0;
-+  if(!empty($project)){
++  if (!empty($project)) {
 +    $accept_suggestions = db_select('l10n_server_project', 'p')->fields('p', array('accept_suggestions'))
 +      ->condition('uri', $project)->execute()->fetchField();
-   }
++  }
  
-   // Attempt to add this as a suggestion.
+-  // Attempt to add this as a suggestion.
 -  $tid = l10n_community_add_suggestion($sid, $translation, $langcode, $uid, $uid, L10N_SERVER_MEDIUM_REMOTE);
++// Attempt to add this as a suggestion.
 +  $tid = l10n_community_add_suggestion($sid, $translation, $langcode, $uid, $uid, L10N_SERVER_MEDIUM_REMOTE, $accept_suggestions);
  
    if ($tid === FALSE) {
@@ -466,8 +469,9 @@ index f36b4d0..784cdaf 100644
      return array('status' => FALSE, 'reason' => 'Empty suggestions are not saved.');
    }
  
-   // If we got this far, everything is fine. Signal success to the client.
+-  // If we got this far, everything is fine. Signal success to the client.
 -  return array('status' => TRUE, 'sid' => $sid);
++// If we got this far, everything is fine. Signal success to the client.
 +  return array('status' => TRUE, 'sid' => $sid, 'tid' => $tid);
 +}
 +
@@ -524,10 +528,10 @@ index f36b4d0..784cdaf 100644
  }
 diff --git a/l10n_remote/tests/l10n_remote.test b/l10n_remote/tests/l10n_remote.test
 new file mode 100644
-index 0000000..736f319
+index 0000000..49ad7c2
 --- /dev/null
 +++ b/l10n_remote/tests/l10n_remote.test
-@@ -0,0 +1,213 @@
+@@ -0,0 +1,212 @@
 +<?php
 +/**
 + * Author: Martin Møller
@@ -670,8 +674,7 @@ index 0000000..736f319
 +    $resp = $this->_submitTranslation($langcode, $source, $translation, $uid, $client_token, $fake_signature, $context, $project);
 +    $this->assertTrue($resp['status'], t('Unknown string was saved with id: %sid', array('%sid' => $resp['sid'])));
 +
-+    //as long as suggestions are approved on the project, submitting the same string should not spawn an error
-+    #$project = 'test_project';
++    //as long suggestions are approved on the project, submitting the same string should not spawn an error
 +    $fake_signature = md5(l10n_remote_user_api_key($uid, $client_token) . $langcode . $source . $translation . $client_token);
 +    $resp = $this->_submitTranslation($langcode, $source, $translation, $uid, $client_token, $fake_signature, $context, $project);
 +    $this->assertTrue($resp['status'], t('Unknown string was saved with id: %sid', array('%sid' => $resp['sid'])));
@@ -756,6 +759,18 @@ index 0000000..c07b2e4
 +++ b/l10n_remote/tests/mockups/translation_en_da.txt
 @@ -0,0 +1 @@
 +a:8:{s:8:"langcode";s:2:"da";s:6:"source";s:13:"Configuration";s:11:"translation";s:13:"Konfiguration";s:3:"uid";i:1;s:12:"client_token";s:32:"9bb46bd397fe13f44e328bd288bba7c7";s:9:"signature";s:32:"37cf0d08d9de47e10a3850373d3f7c8e";s:7:"context";s:0:"";s:7:"project";s:12:"test_project";}
+diff --git a/l10n_server/l10n_server.info b/l10n_server/l10n_server.info
+index 39f2531..06fe05c 100644
+--- a/l10n_server/l10n_server.info
++++ b/l10n_server/l10n_server.info
+@@ -1,5 +1,5 @@
+-name = Localization server
+-description = Base backend module for localization server
++name = DBC Localization server
++description = Base backend module for localization server - modified to be used at DBC A/S
+ package = "Localization server"
+ dependencies[] = locale
+ dependencies[] = l10n_pconfig
 diff --git a/l10n_server/l10n_server.install b/l10n_server/l10n_server.install
 index ddf19eb..5583769 100644
 --- a/l10n_server/l10n_server.install

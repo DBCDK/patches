@@ -39,7 +39,7 @@ index def53e7..a78afc4 100644
      } else {
        Drupal.l10nClient.toggle(0);
 diff --git a/l10n_client.module b/l10n_client.module
-index 71811e2..4b177b6 100644
+index 71811e2..aab54fa 100644
 --- a/l10n_client.module
 +++ b/l10n_client.module
 @@ -97,10 +97,10 @@ function l10n_client_init() {
@@ -210,7 +210,7 @@ index 71811e2..4b177b6 100644
 +    else {
        $message = t('Translation rejected by @server. Reason: %reason', array('%reason' => $response['reason'], '@server' => $server_url));
 -      watchdog('l10n_client', 'Translation rejected by @server. Reason: %reason', array('%reason' => $response['reason'], '@server' => $server_url), WATCHDOG_WARNING);
-+      watchdog('l10n_client', 'Translation rejected by @server. Soruce: %source - translation: %translation. Reason: %reason', array('%reason' => $response['reason'], '%source' => $source, '%translation' => $translation, '@server' => $server_url), WATCHDOG_WARNING);
++      watchdog('l10n_client', 'Translation rejected by @server. Source: %source - translation: %translation. Reason: %reason', array('%reason' => $response['reason'], '%source' => $source, '%translation' => $translation, '@server' => $server_url), WATCHDOG_WARNING);
      }
      return array($response['status'], $message);
    }
