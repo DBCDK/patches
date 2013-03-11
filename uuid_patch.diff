@@ -1,0 +1,10 @@
+--- uuid.tokens.inc	2013-03-11 09:58:03.943692841 +0100
++++ uuid.tokens.patched.inc	2013-03-11 09:58:50.355691183 +0100
+@@ -45,6 +45,7 @@
+  * Implements hook_tokens().
+  */
+ function uuid_tokens($type, $tokens, array $data = array(), array $options = array()) {
++  $replacements = array();
+   switch ($type) {
+     case 'node':
+       $node = $data['node'];
