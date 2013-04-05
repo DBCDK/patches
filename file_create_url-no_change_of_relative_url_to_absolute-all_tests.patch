@@ -1,0 +1,101 @@
+diff --git a/includes/file.inc b/includes/file.inc
+index c5e5cf0..6f22963 100644
+--- a/includes/file.inc
++++ b/includes/file.inc
+@@ -383,8 +383,8 @@ function file_create_url($uri) {
+   if (!$scheme) {
+     // Allow for:
+     // - root-relative URIs (e.g. /foo.jpg in http://example.com/foo.jpg)
+-    // - protocol-relative URIs (e.g. //bar.jpg, which is expanded to
+-    //   http://example.com/bar.jpg by the browser when viewing a page over
++    // - protocol-relative URIs (e.g. //example.com/bar.jpg, which is expanded
++    //   to http://example.com/bar.jpg by the browser when viewing a page over
+     //   HTTP and to https://example.com/bar.jpg when viewing a HTTPS page)
+     // Both types of relative URIs are characterized by a leading slash, hence
+     // we can use a single check.
+@@ -392,9 +392,12 @@ function file_create_url($uri) {
+       return $uri;
+     }
+     else {
+-      // If this is not a properly formatted stream, then it is a shipped file.
+-      // Therefore, return the urlencoded URI with the base URL prepended.
+-      return $GLOBALS['base_url'] . '/' . drupal_encode_path($uri);
++      // This is a shipped file and the path is relative to the Drupal
++      // installation. Therefore, return the urlencoded URI
++      // with the base path prepended. Base path is used because there should be
++      // no need to make a relative URI absolute which the use of base URL
++      // would do.
++      return $GLOBALS['base_path'] . drupal_encode_path($uri);
+     }
+   }
+   elseif ($scheme == 'http' || $scheme == 'https') {
+diff --git a/modules/simpletest/drupal_web_test_case.php b/modules/simpletest/drupal_web_test_case.php
+index 251c5c1..734573e 100644
+--- a/modules/simpletest/drupal_web_test_case.php
++++ b/modules/simpletest/drupal_web_test_case.php
+@@ -449,7 +449,7 @@ protected function verbose($message) {
+     if ($id = simpletest_verbose($message)) {
+       $class_safe = str_replace('\\', '_', get_class($this));
+       $url = file_create_url($this->originalFileDirectory . '/simpletest/verbose/' . $class_safe . '-' . $id . '.html');
+-      $this->error(l(t('Verbose message'), $url, array('attributes' => array('target' => '_blank'))), 'User notice');
++      $this->error(l(t('Verbose message'), $this->getAbsoluteUrl($url), array('attributes' => array('target' => '_blank'))), 'User notice');
+     }
+   }
+ 
+diff --git a/modules/simpletest/tests/common.test b/modules/simpletest/tests/common.test
+index 437b67c..6bfab40 100644
+--- a/modules/simpletest/tests/common.test
++++ b/modules/simpletest/tests/common.test
+@@ -749,7 +749,7 @@ class CascadingStylesheetsTestCase extends DrupalWebTestCase {
+     $styles = drupal_get_css();
+     // Stylesheet URL may be the href of a LINK tag or in an @import statement
+     // of a STYLE tag.
+-    if (preg_match_all('/(href="|url\(")' . preg_quote($GLOBALS['base_url'] . '/', '/') . '([^?]+)\?/', $styles, $matches)) {
++    if (preg_match_all('/(href="|url\(")' . preg_quote($GLOBALS['base_path'], '/') . '([^?]+)\?/', $styles, $matches)) {
+       $result = $matches[2];
+     }
+     else {
+diff --git a/modules/simpletest/tests/file.test b/modules/simpletest/tests/file.test
+index 3df31ba..1642413 100644
+--- a/modules/simpletest/tests/file.test
++++ b/modules/simpletest/tests/file.test
+@@ -2364,9 +2364,11 @@ class FileDownloadTest extends FileTestCase {
+     // Test generating an URL to a shipped file (i.e. a file that is part of
+     // Drupal core, a module or a theme, for example a JavaScript file).
+     $filepath = 'misc/jquery.js';
+-    $url = file_create_url($filepath);
+-    $this->assertEqual($GLOBALS['base_url'] . '/' . $filepath, $url, t('Correctly generated a URL for a shipped file.'));
+-    $this->drupalHead($url);
++    $relative_url = file_create_url($filepath);
++    $this->assertEqual($GLOBALS['base_path'] . $filepath, $relative_url, t('Correctly generated a URL for a shipped file.'));
++    // make relative URL absolute as a web browser would do
++    $absolute_url = $this->getAbsoluteUrl($relative_url);
++    $this->drupalHead($absolute_url);
+     $this->assertResponse(200, t('Confirmed that the generated URL is correct by downloading the shipped file.'));
+   }
+ 
+diff --git a/modules/system/system.test b/modules/system/system.test
+index abd21aa..0df9ed5 100644
+--- a/modules/system/system.test
++++ b/modules/system/system.test
+@@ -1655,17 +1655,17 @@ class SystemThemeFunctionalTest extends DrupalWebTestCase {
+       // Relative path to a public file.
+       $file_relative => array(
+         'form' => $file_relative,
+-        'src' => file_create_url($file->uri),
++        'src' => file_create_url($file_relative),
+       ),
+       // Relative path to an arbitrary file.
+       'misc/druplicon.png' => array(
+         'form' => 'misc/druplicon.png',
+-        'src' => $GLOBALS['base_url'] . '/' . 'misc/druplicon.png',
++        'src' => file_create_url('misc/druplicon.png'),
+       ),
+       // Relative path to a file in a theme.
+       $default_theme_path . '/logo.png' => array(
+         'form' => $default_theme_path . '/logo.png',
+-        'src' => $GLOBALS['base_url'] . '/' . $default_theme_path . '/logo.png',
++        'src' => file_create_url($default_theme_path . '/logo.png'),
+       ),
+     );
+     foreach ($supported_paths as $input => $expected) {
