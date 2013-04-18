@@ -1,0 +1,34 @@
+diff --git a/nanosoap.inc b/nanosoap.inc
+index 29235d5..1f44907 100644
+--- a/nanosoap.inc
++++ b/nanosoap.inc
+@@ -15,6 +15,9 @@ class NanoSOAPClient {
+    */
+   public $endpoint;
+ 
++  /** info from the latest curl response */
++  private $curl_info;
++
+   /**
+    * DOMDocument instance for the request body.
+    *
+@@ -87,6 +90,8 @@ class NanoSOAPClient {
+ 
+     $response = curl_exec($ch);
+ 
++    $this->curl_info = curl_getinfo($ch);
++
+     if ($response === FALSE) {
+       throw new NanoSOAPcURLException(curl_error($ch));
+     }
+@@ -96,6 +101,10 @@ class NanoSOAPClient {
+     return $response;
+   }
+ 
++  function getCurlInfo(){
++    return $this->curl_info;
++  }
++
+   /**
+    * Make a SOAP request.
+    *
