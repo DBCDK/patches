@@ -1,0 +1,14 @@
+diff --git a/nanosoap.inc b/nanosoap.inc
+index 29235d5..e8e2ff4 100644
+--- a/nanosoap.inc
++++ b/nanosoap.inc
+@@ -69,6 +69,9 @@ class NanoSOAPClient {
+       CURLOPT_RETURNTRANSFER => TRUE,
+     );
+ 
++    // Add Curl Cookie with Session ID to help load-balancing
++    $curl_options[CURLOPT_COOKIE] = session_name() . '=' . session_id();
++
+     if ($method == 'POST') {
+       $curl_options[CURLOPT_POST] = TRUE;
+ 
