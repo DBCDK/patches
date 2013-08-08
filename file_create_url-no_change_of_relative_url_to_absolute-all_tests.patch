@@ -64,14 +64,14 @@ index 3df31ba..1642413 100644
      // Drupal core, a module or a theme, for example a JavaScript file).
      $filepath = 'misc/jquery.js';
 -    $url = file_create_url($filepath);
--    $this->assertEqual($GLOBALS['base_url'] . '/' . $filepath, $url, t('Correctly generated a URL for a shipped file.'));
+-    $this->assertEqual($GLOBALS['base_url'] . '/' . $filepath, $url, 'Correctly generated a URL for a shipped file.');
 -    $this->drupalHead($url);
 +    $relative_url = file_create_url($filepath);
-+    $this->assertEqual($GLOBALS['base_path'] . $filepath, $relative_url, t('Correctly generated a URL for a shipped file.'));
++    $this->assertEqual($GLOBALS['base_path'] . $filepath, $relative_url, 'Correctly generated a URL for a shipped file.');
 +    // make relative URL absolute as a web browser would do
 +    $absolute_url = $this->getAbsoluteUrl($relative_url);
 +    $this->drupalHead($absolute_url);
-     $this->assertResponse(200, t('Confirmed that the generated URL is correct by downloading the shipped file.'));
+     $this->assertResponse(200, 'Confirmed that the generated URL is correct by downloading the shipped file.');
    }
  
 diff --git a/modules/system/system.test b/modules/system/system.test
