@@ -2,7 +2,7 @@
 +++ js/user-alert.js	2013-12-20 13:52:43.328622498 +0100
 @@ -1,4 +1,7 @@
  (function ($) {
-+ if ( $('.rs-carousel').length == 0 ) {
++ if ( $('.block-user-alert').length == 0 ) {
 +   return;
 + }
    Drupal.behaviors.user_alert_get_message = {
