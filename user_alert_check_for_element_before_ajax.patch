@@ -1,10 +1,31 @@
---- js/user-alert.js.orig	2013-12-20 14:11:52.332581426 +0100
-+++ js/user-alert.js	2013-12-20 13:52:43.328622498 +0100
-@@ -1,4 +1,7 @@
+diff --git a/js/user-alert.js b/js/user-alert.js
+index 883b8e8..4025e6d 100644
+--- a/js/user-alert.js
++++ b/js/user-alert.js
+@@ -1,6 +1,9 @@
  (function ($) {
-+ if ( $('.block-user-alert').length == 0 ) {
-+   return;
-+ }
    Drupal.behaviors.user_alert_get_message = {
      attach: function(context) {
++      if ( !$('.block-user-alert').length ) {
++        return;
++      }
        $.ajax({
+         type: 'GET',
+         url: Drupal.settings.basePath + Drupal.settings.pathPrefix + Drupal.settings.user_alert.url_prefix + 'js/user-alert/get-message',
+@@ -8,7 +11,7 @@
+           $('.block-user-alert').html(response[1].data);
+         }
+       });
+-    	
++
+       $('body').delegate('div.user-alert-close a', 'click', function() {
+         id = $(this).attr('rel');
+         $.ajax({
+@@ -20,6 +23,6 @@
+           }
+         });
+       });
+-  	}
++    }
+   };
+ }(jQuery));
