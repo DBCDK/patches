@@ -18,7 +18,7 @@ index 883b8e8..024c530 100644
          id = $(this).attr('rel');
          $.ajax({
 diff --git a/user_alert.module b/user_alert.module
-index df5d837..167eb24 100644
+index df5d837..d1e672b 100644
 --- a/user_alert.module
 +++ b/user_alert.module
 @@ -108,7 +108,7 @@ function user_alert_block_info() {
@@ -47,3 +47,12 @@ index df5d837..167eb24 100644
  
  	foreach ($result as $record) {
  		$alert = node_load($record->nid);
+@@ -196,7 +196,7 @@ function user_alert_preprocess_user_alert(&$vars) {
+   $node = $vars['node'];
+   $vars['alert_label'] = variable_get('user_alert_label', 'User Alert');
+   $vars['nid'] = $vars['node']->nid;
+-  $vars['body'] = $vars['node']->body[$vars['node']->language][0]['value'];
++  $vars['body'] = $vars['node']->body['und'][0]['value'];
+   $vars['is_closeable'] = user_alert_cookie_is_valid();
+ }
+ 
