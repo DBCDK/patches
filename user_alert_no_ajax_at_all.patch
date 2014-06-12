@@ -1,0 +1,49 @@
+diff --git a/js/user-alert.js b/js/user-alert.js
+index 883b8e8..024c530 100644
+--- a/js/user-alert.js
++++ b/js/user-alert.js
+@@ -1,14 +1,6 @@
+ (function ($) {
+   Drupal.behaviors.user_alert_get_message = {
+     attach: function(context) {
+-      $.ajax({
+-        type: 'GET',
+-        url: Drupal.settings.basePath + Drupal.settings.pathPrefix + Drupal.settings.user_alert.url_prefix + 'js/user-alert/get-message',
+-        success: function(response) {
+-          $('.block-user-alert').html(response[1].data);
+-        }
+-      });
+-    	
+       $('body').delegate('div.user-alert-close a', 'click', function() {
+         id = $(this).attr('rel');
+         $.ajax({
+diff --git a/user_alert.module b/user_alert.module
+index df5d837..167eb24 100644
+--- a/user_alert.module
++++ b/user_alert.module
+@@ -108,7 +108,7 @@ function user_alert_block_info() {
+  function user_alert_block_view($delta) {
+   if ($delta == 'user_alert') {
+     $block['subject'] = '<none>';
+-    $block['content'] = ' ';
++    $block['content'] = array('#markup' => user_alert_display_alert());
+     return $block;
+   }
+ }
+@@ -145,13 +145,13 @@ function user_alert_form($node, &$form_state) {
+ function user_alert_display_alert() {
+   if (module_exists('translation')) {
+     global $language;
+-    $language = $language->language;
++    $lang = $language->language;
+   } else {
+-    $language = LANGUAGE_NONE;
++    $lang = LANGUAGE_NONE;
+   }
+ 
+ 	$output = '';
+-	$result = db_query("SELECT n.nid FROM {node} n WHERE type = :type AND status = :status AND language = :language AND n.nid NOT IN (SELECT ua.nid FROM {user_alert} ua WHERE ua.nid = n.nid AND ua.uuid = :cookie) ORDER BY nid DESC", array(':type' => 'user_alert', ':status' => NODE_PUBLISHED,  ':language' => $language, ':cookie' => $_COOKIE['UUID']));
++	$result = db_query("SELECT n.nid FROM {node} n WHERE type = :type AND status = :status AND language = :language AND n.nid NOT IN (SELECT ua.nid FROM {user_alert} ua WHERE ua.nid = n.nid AND ua.uuid = :cookie) ORDER BY nid DESC", array(':type' => 'user_alert', ':status' => NODE_PUBLISHED,  ':language' => $lang, ':cookie' => $_COOKIE['UUID']));
+ 
+ 	foreach ($result as $record) {
+ 		$alert = node_load($record->nid);
