@@ -1,0 +1,12 @@
+diff --git a/includes/module.inc b/includes/module.inc
+index 11cccac..fe2a980 100644
+--- a/includes/module.inc
++++ b/includes/module.inc
+@@ -390,7 +390,6 @@ function module_enable($module_list, $enable_dependencies = TRUE) {
+     while (list($module) = each($module_list)) {
+       if (!isset($module_data[$module])) {
+         // This module is not found in the filesystem, abort.
+-        die($module . ' was not found!');
+         return FALSE;
+       }
+       if ($module_data[$module]->status) {
