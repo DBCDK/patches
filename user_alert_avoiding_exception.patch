@@ -1,0 +1,14 @@
+diff --git a/user_alert.module b/user_alert.module
+index 85eab754293b6f80c5cc6d4152fcd3af30dafa9a..d1e672baf0f0e81a826ed0039e14fd39da255316 100644
+--- a/user_alert.module
++++ b/user_alert.module
+@@ -151,9 +151,6 @@ function user_alert_display_alert() {
+   }
+ 
+ 	$output = '';
+-  if(empty($_COOKIE['UUID'])){
+-    $_COOKIE['UUID'] = NULL;
+-  }
+ 	$result = db_query("SELECT n.nid FROM {node} n WHERE type = :type AND status = :status AND language = :language AND n.nid NOT IN (SELECT ua.nid FROM {user_alert} ua WHERE ua.nid = n.nid AND ua.uuid = :cookie) ORDER BY nid DESC", array(':type' => 'user_alert', ':status' => NODE_PUBLISHED,  ':language' => $lang, ':cookie' => $_COOKIE['UUID']));
+ 
+ 	foreach ($result as $record) {
