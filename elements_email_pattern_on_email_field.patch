@@ -1,0 +1,11 @@
+diff -u elements1/elements.theme.inc elements/elements.theme.inc
+--- elements1/elements.theme.inc	2015-03-09 09:31:16.888727827 +0100
++++ elements/elements.theme.inc	2015-03-09 09:31:30.528728384 +0100
+@@ -21,6 +21,7 @@
+ function theme_emailfield($variables) {
+   $element = $variables['element'];
+   $element['#attributes']['type'] = 'email';
++  $element['#attributes']['pattern'] = "[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$";
+   element_set_attributes($element, array('id', 'name', 'value', 'size', 'maxlength', 'placeholder'));
+   _form_set_class($element, array('form-text', 'form-email'));
+ 
