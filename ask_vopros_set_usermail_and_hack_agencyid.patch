@@ -1,0 +1,25 @@
+--- ask_vopros.module	2015-03-16 13:18:48.883161412 +0100
++++ ask_vopros.module.patched	2015-03-16 13:23:58.167174044 +0100
+@@ -37,6 +37,10 @@
+     $agency_id = variable_get('ask_vopros_agency_id', '');
+   }
+ 
++  if($agency_id == 'DK-190101'){
++    $agency_id = 'bibliotek.dk';
++  }
++
+   if (!$agency_id) {
+     return;
+   }
+@@ -77,6 +81,11 @@
+     if (!empty($user->mail)) {
+       $settings['mail'] = $user->mail;
+     }
++  }
++  else{
++    if (!empty($user->mail)) {
++      $settings['mail'] = $user->mail;
++    }
+   }
+ 
+   $settings_js = 'var ask_vopros = ' . json_encode($settings) . ';';
