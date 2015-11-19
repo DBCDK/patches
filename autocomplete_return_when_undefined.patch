@@ -1,0 +1,12 @@
+--- misc/autocomplete.js	2015-11-19 10:35:55.846346856 +0100
++++ misc/autocomplete_undefined.js	2015-11-19 10:35:45.814352768 +0100
+@@ -113,6 +113,9 @@
+  * Puts the currently highlighted suggestion into the autocomplete field.
+  */
+ Drupal.jsAC.prototype.select = function (node) {
++  if(typeof ($(node).data('autocompleteValue')) == 'undefined'){
++    return;
++  }
+   this.input.value = $(node).data('autocompleteValue');
+   $(this.input).trigger('autocompleteSelect', [node]);
+ };
