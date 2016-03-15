@@ -1,0 +1,42 @@
+--- ask_vopros.module	2016-03-15 08:27:30.668513248 +0100
++++ ask_vopros.module.patched	2016-03-15 08:29:30.719543581 +0100
+@@ -44,6 +44,10 @@
+   global $user;
+   $agency_id = variable_get('ask_vopros_agency_id', _ask_vopros_ting_agency_id());
+ 
++  if($agency_id == 'DK-190101'){
++    $agency_id = 'bibliotek.dk';
++  }
++
+   if (!$agency_id) {
+     return;
+   }
+@@ -85,6 +89,11 @@
+       $widget_settings['mail'] = $user->mail;
+     }
+   }
++  else{
++    if (!empty($user->mail)) {
++      $settings['mail'] = $user->mail;
++    }
++  }
+ 
+   // Check visibility settings. We add the query argument to get
+   // question_modal.js to add the tab for us.
+@@ -221,6 +230,9 @@
+     'open' => NULL,
+     'close' => NULL,
+   );
++
++
++if(!empty($opening_hours)) {
+   foreach (array('open', 'close') as $state) {
+     if ($opening_hours[$state][$day]) {
+       list($hours, $minutes) = explode(':', $opening_hours[$state][$day]);
+@@ -229,5 +241,6 @@
+       $times[$state] = $time->format('U') * 1000;
+     }
+   }
++}
+   return $times;
+ }
