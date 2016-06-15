@@ -17,7 +17,7 @@
    }
 +  else{
 +    if (!empty($user->mail)) {
-+      $settings['mail'] = $user->mail;
++      $widget_settings['mail'] = $user->mail;
 +    }
 +  }
  
