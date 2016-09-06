@@ -1,0 +1,11 @@
+--- includes/plugins.inc	2015-01-28 20:17:17.000000000 +0100
++++ includes/plugins.inc.patched	2016-09-06 07:51:38.573421653 +0200
+@@ -125,7 +125,7 @@
+   /**
+    * When constructed, take a snapshot of our existing out of band data.
+    */
+-  function panels_cache_object() {
++  function __construct() {
+     $this->head = drupal_add_html_head();
+     $this->css = drupal_add_css();
+     $this->tokens = ctools_set_page_token();
