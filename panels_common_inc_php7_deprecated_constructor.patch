@@ -1,11 +1,11 @@
---- common.inc.patched	2016-08-30 10:38:37.197578706 +0200
-+++ common.inc	2015-01-28 20:17:17.000000000 +0100
+--- includes/common.inc	2015-01-28 20:17:17.000000000 +0100
++++ includes/common.inc.patch	2016-09-09 07:18:27.856988733 +0200
 @@ -89,7 +89,7 @@
     *  as allowed or not allowed on the initial call to panels_allowed_layouts::set_allowed()
     *
     */
--  function __construct($start_allowed = TRUE) {
-+  function panels_allowed_layouts($start_allowed = TRUE) {
+-  function panels_allowed_layouts($start_allowed = TRUE) {
++  function __construct($start_allowed = TRUE) {
      // TODO would be nice if there was a way to just fetch the names easily
      foreach ($this->list_layouts() as $layout_name) {
        $this->allowed_layout_settings[$layout_name] = $start_allowed ? 1 : 0;
