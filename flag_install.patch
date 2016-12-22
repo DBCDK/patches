@@ -1,6 +1,6 @@
---- flag.install.old    2016-12-21 15:00:11.000000000 +0100
-+++ flag.install        2016-12-15 08:58:02.000000000 +0100
-@@ -87,8 +87,8 @@ function flag_schema() {
+--- flag.install.old	2016-12-22 10:37:54.000000000 +0100
++++ flag.install	2016-12-22 10:52:20.000000000 +0100
+@@ -87,10 +87,10 @@ function flag_schema() {
        ),
        'entity_id' => array(
          'description' => 'The unique ID of the flagged entity, for example the uid, cid, or nid.',
@@ -9,9 +9,12 @@
 +        'type' => 'varchar',
 +        'length' => '255',
          'not null' => TRUE,
-         'default' => 0,
+-        'default' => 0,
++        'default' => '',
        ),
-@@ -174,8 +174,8 @@ function flag_schema() {
+       'uid' => array(
+         'description' => 'The user ID by whom this object was flagged.',
+@@ -174,10 +174,10 @@ function flag_schema() {
        ),
        'entity_id' => array(
          'description' => 'The unique ID of the flagged entity, for example the uid, cid, or nid.',
@@ -20,5 +23,8 @@
 +        'type' => 'varchar',
 +        'length' => '255',
          'not null' => TRUE,
-         'default' => 0,
-         'disp-width' => '10',
+-        'default' => 0,
++        'default' => '',
+       ),
+       'count' => array(
+         'description' => 'The number of times this object has been flagged for this flag.',
