@@ -1,0 +1,24 @@
+--- flag.install.old    2016-12-21 15:00:11.000000000 +0100
++++ flag.install        2016-12-15 08:58:02.000000000 +0100
+@@ -87,8 +87,8 @@ function flag_schema() {
+       ),
+       'entity_id' => array(
+         'description' => 'The unique ID of the flagged entity, for example the uid, cid, or nid.',
+-        'type' => 'int',
+-        'unsigned' => TRUE,
++        'type' => 'varchar',
++        'length' => '255',
+         'not null' => TRUE,
+         'default' => 0,
+       ),
+@@ -174,8 +174,8 @@ function flag_schema() {
+       ),
+       'entity_id' => array(
+         'description' => 'The unique ID of the flagged entity, for example the uid, cid, or nid.',
+-        'type' => 'int',
+-        'unsigned' => TRUE,
++        'type' => 'varchar',
++        'length' => '255',
+         'not null' => TRUE,
+         'default' => 0,
+         'disp-width' => '10',
