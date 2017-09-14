@@ -1,0 +1,173 @@
+--- zabbix.module.patch	2017-09-14 13:48:57.014909865 +0200
++++ zabbix.module	2017-09-14 12:53:59.625702760 +0200
+@@ -519,8 +519,8 @@
+  * Return the time that the admin user last logged in as a unix timestamp.
+  */
+ function zabbix_last_admin_login() {
+-  $time = (int) reset(db_query("SELECT login FROM {users} WHERE uid = 1"));
+-  return $time;
++  $time = db_query("SELECT login FROM {users} WHERE uid = 1");
++  return $time->fetchField();
+ }
+ 
+ /**
+@@ -532,8 +532,8 @@
+     $interval = variable_get('zabbix_zabbix_watchdog_emergencies_run_interval', 86400);
+     $last_run -= $interval;
+   }
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_EMERG, ':timestamp' => $last_run)));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_EMERG, ':timestamp' => $last_run));
++  return $count->fetchField();
+ }
+ 
+ /**
+@@ -545,8 +545,8 @@
+     $interval = variable_get('zabbix_zabbix_watchdog_alerts_run_interval', 86400);
+     $last_run -= $interval;
+   }
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_ALERT, ':timestamp' => $last_run)));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_ALERT, ':timestamp' => $last_run));
++  return $count->fetchField();
+ }
+ 
+ /**
+@@ -558,8 +558,8 @@
+     $interval = variable_get('zabbix_zabbix_watchdog_critical_run_interval', 86400);
+     $last_run -= $interval;
+   }
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_CRITICAL, ':timestamp' => $last_run)));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_CRITICAL, ':timestamp' => $last_run));
++  return $count->fetchField();
+ }
+ 
+ /**
+@@ -571,8 +571,8 @@
+     $interval = variable_get('zabbix_zabbix_watchdog_errors_run_interval', 86400);
+     $last_run -= $interval;
+   }
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_ERROR, ':timestamp' => $last_run)));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_ERROR, ':timestamp' => $last_run));
++  return $count->fetchField();
+ }
+ 
+ /**
+@@ -584,8 +584,8 @@
+     $interval = variable_get('zabbix_zabbix_watchdog_errors_run_interval', 86400);
+     $last_run -= $interval;
+   }
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_WARNING, ':timestamp' => $last_run)));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_WARNING, ':timestamp' => $last_run));
++  return $count->fetchField();
+ }
+ 
+ /**
+@@ -597,8 +597,8 @@
+     $interval = variable_get('zabbix_zabbix_watchdog_errors_run_interval', 86400);
+     $last_run -= $interval;
+   }
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_NOTICE, ':timestamp' => $last_run)));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_NOTICE, ':timestamp' => $last_run));
++  return $count->fetchField();
+ }
+ 
+ /**
+@@ -610,8 +610,8 @@
+     $interval = variable_get('zabbix_zabbix_watchdog_info_run_interval', 86400);
+     $last_run -= $interval;
+   }
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_INFO, ':timestamp' => $last_run)));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_INFO, ':timestamp' => $last_run));
++  return $count->fetchField();
+ }
+ 
+ /**
+@@ -623,8 +623,8 @@
+     $interval = variable_get('zabbix_zabbix_watchdog_debug_run_interval', 86400);
+     $last_run -= $interval;
+   }
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_DEBUG, ':timestamp' => $last_run)));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_DEBUG, ':timestamp' => $last_run));
++  return $count->fetchField();
+ }
+ 
+ /**
+@@ -636,24 +636,24 @@
+     $interval = variable_get('zabbix_zabbix_watchdog_errors_run_interval', 86400);
+     $last_run -= $interval;
+   }
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {watchdog} WHERE type = 'php' and timestamp > :type", array(':type' => $last_run)));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE type = 'php' and timestamp > :type", array(':type' => $last_run));
++  return $count->fetchField();
+ }
+ 
+ /**
+  * Count the total number of users on the site
+  */
+ function zabbix_count_all_users() {
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {users} WHERE uid != 0 AND uid IS NOT NULL"));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {users} WHERE uid != 0 AND uid IS NOT NULL");
++  return $count->fetchField();
+ }
+ 
+ /**
+  * Count the number of active users on the site
+  */
+ function zabbix_count_active_users() {
+-  $count = (int) reset(db_query("SELECT COUNT(*) FROM {users} WHERE status = 1 AND uid != 0 AND uid IS NOT NULL"));
+-  return $count;
++  $count = db_query("SELECT COUNT(*) FROM {users} WHERE status = 1 AND uid != 0 AND uid IS NOT NULL");
++  return $count->fetchField();
+ }
+ 
+ /**
+@@ -663,7 +663,7 @@
+   $result = db_query("SELECT name FROM {system} WHERE status = 1 AND type = 'module' ORDER BY name");
+   $modules = '';
+   foreach($result as $row){
+-    $modules .= $modules_run_interval ? ','. $row->name : $row->name;
++    $modules .= !empty($modules) ? ','. $row->name : $row->name;
+   }
+   return $modules;
+ }
+@@ -684,16 +684,16 @@
+  * Count the number of published nodes on the site.
+  */
+ function zabbix_count_published_nodes() {
+-  $count = (int) reset(db_query("SELECT COUNT(DISTINCT nid) FROM {node} WHERE status = 1"));
+-  return $count;
++  $count = db_query("SELECT COUNT(DISTINCT nid) FROM {node} WHERE status = 1");
++  return $count->fetchField();
+ }
+ 
+ /**
+  * Count the total number of node on the site.
+  */
+ function zabbix_count_all_nodes() {
+-  $count = (int) reset(db_query("SELECT COUNT(DISTINCT nid) FROM {node}"));
+-  return $count;
++  $count = db_query("SELECT COUNT(DISTINCT nid) FROM {node}");
++  return $count->fetchField();
+ }
+ 
+ /**
+@@ -715,8 +715,8 @@
+  */
+ function zabbix_count_sessions_auth() {
+   $interval = time() - 900;
+-  $count = (int) reset(db_query("SELECT COUNT(sid) FROM {sessions} WHERE timestamp >= :timestamp", array(':timestamp' => $interval)));
+-  return $count ? $count : 0;
++  $count = db_query("SELECT COUNT(sid) FROM {sessions} WHERE timestamp >= :timestamp", array(':timestamp' => $interval));
++  return $count ? $count->fetchField() : 0;
+ }
+ 
+ /**
