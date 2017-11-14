@@ -17,7 +17,7 @@
    }
 -  $count = (int) reset(db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_EMERG, ':timestamp' => $last_run)));
 -  return $count;
-+  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_EMERG, ':timestamp' => $last_run));
++  $count = db_query("SELECT COUNT(*) FROM {watchdog} WHERE severity = :severity and timestamp > :timestamp", array(':severity' => WATCHDOG_EMERGENCY, ':timestamp' => $last_run));
 +  return $count->fetchField();
  }
  
