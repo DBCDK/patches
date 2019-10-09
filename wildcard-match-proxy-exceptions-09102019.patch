@@ -1,0 +1,17 @@
+index f61d1eb0f..00b543540 100644
+--- includes/common.inc
++++ includes/common.inc
+@@ -1141,7 +1141,12 @@ function _drupal_parse_response_status($response) {
+  */
+ function _drupal_http_use_proxy($host) {
+   $proxy_exceptions = variable_get('proxy_exceptions', array('localhost', '127.0.0.1'));
+-  return !in_array(strtolower($host), $proxy_exceptions, TRUE);
++  foreach ($proxy_exceptions as $exception) {
++    if (fnmatch($exception, $host)) {
++      return FALSE;
++    }
++  }
++  return TRUE;
+ }
+ 
+ /**
