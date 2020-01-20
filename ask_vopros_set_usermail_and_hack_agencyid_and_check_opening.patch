@@ -11,6 +11,14 @@
    if (!$agency_id) {
      return;
    }
+@@ -52,6 +56,7 @@ function ask_vopros_preprocess_html(&$vars) {
+   $widget_settings = array(
+     'agency_id' => $agency_id,
+     'agency_mail' => variable_get('ask_vopros_agency_mail', variable_get('site_mail', '')),
++    'require_postal_code' => 'true',
+   );
+
+   $answer_preference = variable_get('ask_vopros_answer_preference', 'mail');
 @@ -85,6 +89,11 @@
        $widget_settings['mail'] = $user->mail;
      }
