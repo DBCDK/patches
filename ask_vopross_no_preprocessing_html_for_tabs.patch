@@ -1,0 +1,20 @@
+--- ask_vopros.module	2020-02-27 11:09:18.766493800 +0100
++++ ask_vopros.module.patch	2020-02-27 11:10:34.061014329 +0100
+@@ -40,7 +40,7 @@
+  * This adds in our bottom tab. Using hook_page_build() is no good, as
+  * panels_everywhere thoroughly disables it, so we use this instead.
+  */
+-function ask_vopros_preprocess_html(&$vars) {
++/*function ask_vopros_preprocess_html(&$vars) {
+   global $user;
+   $agency_id = variable_get('ask_vopros_agency_id', _ask_vopros_ting_agency_id());
+ 
+@@ -193,7 +193,7 @@
+ 
+     $vars['page']['page_bottom'][] = $element;
+   }
+-}
++}*/
+ 
+ /**
+  * Glean agency_id from ting.module.
