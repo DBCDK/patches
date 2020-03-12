@@ -1,5 +1,5 @@
---- common.inc	2020-03-12 15:01:06.341248123 +0100
-+++ common.inc.patch	2020-03-12 15:04:01.774899199 +0100
+--- includes/common.inc	2020-03-12 15:17:11.529741861 +0100
++++ includes/common.inc.patch	2020-03-12 15:04:01.774899199 +0100
 @@ -6840,7 +6840,7 @@
    foreach ($parents as $parent) {
      // PHP auto-creates container arrays and NULL entries without error if $ref
