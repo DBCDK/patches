@@ -1,11 +1,11 @@
---- includes/common.inc	2020-03-12 15:17:11.529741861 +0100
-+++ includes/common.inc.patch	2020-03-12 15:04:01.774899199 +0100
+--- includes/common.inc	2020-03-12 10:25:01.000000000 +0100
++++ includes/common.inc.patch	2020-03-13 09:05:14.018535054 +0100
 @@ -6840,7 +6840,7 @@
    foreach ($parents as $parent) {
      // PHP auto-creates container arrays and NULL entries without error if $ref
      // is NULL, but throws an error if $ref is set, but not an array.
--    if ($force && isset($ref) && !is_array($ref)) {  
-+    if (($force && isset($ref) && !is_array($ref)) || is_string($ref)) {  
+-    if ($force && isset($ref) && !is_array($ref)) {
++    if ( ($force && isset($ref) && !is_array($ref)) || is_string($ref) ) {
        $ref = array();
      }
      $ref = &$ref[$parent];
