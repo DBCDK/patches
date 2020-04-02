@@ -1,0 +1,11 @@
+--- memcache-lock.inc	2017-02-20 16:04:02.000000000 +0100
++++ memcache-lock.inc.patch	2020-04-02 11:38:10.898049281 +0200
+@@ -16,7 +16,7 @@
+ // dmemcache_object always returns TRUE, we don't need these stats but it forces
+ // us to try and connect to memcache. If this fails, we can't store locks in
+ // memcache.
+-if (!$mc->getStats()) {
++if (!$mc || !is_object($mc)) {
+   $lock_file = DRUPAL_ROOT . '/includes/lock.inc';
+ }
+ require_once $lock_file;
