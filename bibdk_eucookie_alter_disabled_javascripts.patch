@@ -1,0 +1,11 @@
+--- eu_cookie_compliance.module	2020-05-18 16:37:19.935119720 +0200
++++ eu_cookie_compliance.module.patch	2020-05-18 16:38:52.191969630 +0200
+@@ -376,6 +376,8 @@
+       $disabled_javascripts = _eu_cookie_compliance_explode_multiple_lines($disabled_javascripts, FALSE);
+       $disabled_javascripts = array_filter($disabled_javascripts, 'strlen');
+ 
++      drupal_alter('eu_cookie_javascripts', $disabled_javascripts);
++
+       foreach ($disabled_javascripts as $script) {
+         $parts = explode('%3A', $script);
+         $category = NULL;
