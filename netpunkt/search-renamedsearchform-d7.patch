@@ -1,0 +1,11 @@
+--- modules/search/search.pages.inc	2018-09-17 07:44:22.491919763 +0200
++++ modules/search/search.pages.inc.patched	2018-09-17 07:41:54.000000000 +0200
+@@ -49,7 +49,7 @@
+   // which will get us back to this page callback. In other words, the search
+   // form submits with POST but redirects to GET. This way we can keep
+   // the search query URL clean as a whistle.
+-  if (empty($_POST['form_id']) || ($_POST['form_id'] != 'search_form' && $_POST['form_id'] != 'search_block_form')) {
++  if (empty($_POST['form_id']) || ($_POST['form_id'] != 'search_form' && $_POST['form_id'] != 'search_block_form' && $_POST['form_id'] != 'netpunkt_search_form')) {
+     $conditions =  NULL;
+     if (isset($info['conditions_callback']) && function_exists($info['conditions_callback'])) {
+       // Build an optional array of more search conditions.
