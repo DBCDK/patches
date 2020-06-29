@@ -1,0 +1,15 @@
+--- chr.module	2020-06-29 07:26:52.019262289 +0200
++++ chr.module.patch	2020-06-29 07:28:29.024353132 +0200
+@@ -368,6 +368,12 @@
+     $proxy = NULL;
+   }
+ 
++  foreach ($proxy['exceptions'] as $exception) {
++    if (fnmatch($exception, $uri['host'])) {
++      $proxy = NULL;
++    }
++  }
++
+   if (!empty($proxy)) {
+     curl_setopt($ch, CURLOPT_PROXY, $proxy['server']);
+     curl_setopt($ch, CURLOPT_PROXYPORT, $proxy['port']);
