@@ -1,25 +1,20 @@
---- CacheEntryTest.php	2020-11-26 11:03:40.000000000 +0100
-+++ CacheEntryTest.php	2020-11-26 11:03:40.000000000 +0100
-@@ -6,10 +6,12 @@
+diff --git a/tests/CacheEntryTest.php b/tests/CacheEntryTest.php
+index 89ced2c..b9a1ce4 100644
+--- a/tests/CacheEntryTest.php
++++ b/tests/CacheEntryTest.php
+@@ -3,13 +3,14 @@
+ namespace Kevinrob\GuzzleCache\Tests;
+
+ use Kevinrob\GuzzleCache\CacheEntry;
++use PHPUnit\Framework\TestCase;
  use Psr\Http\Message\RequestInterface;
  use Psr\Http\Message\ResponseInterface;
- 
-+use PHPunit\Framework\TestCase;
-+
+
  /**
   * @group time-sensitive
   */
 -class CacheEntryTest extends \PHPUnit_Framework_TestCase
-+class CacheEntryTest1 extends TestCase
++class CacheEntryTest extends TestCase
  {
      /**
       * @var RequestInterface
-@@ -23,7 +25,7 @@
- 
-     private $responseHeaders = [];
- 
--    protected function setUp()
-+    protected function setUp(): void
-     {
-         parent::setUp();
-         $this->request = $this->getMockBuilder(RequestInterface::class)->getMock();
