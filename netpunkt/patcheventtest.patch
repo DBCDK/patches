@@ -1,0 +1,17 @@
+diff --git a/tests/PatchEventTest.php b/tests/PatchEventTest.php
+index 0f6adb7..4629f59 100644
+--- a/tests/PatchEventTest.php
++++ b/tests/PatchEventTest.php
+@@ -8,10 +8,11 @@
+ namespace cweagans\Composer\Tests;
+
+ use cweagans\Composer\PatchEvent;
++use PHPUnit\Framework\TestCase;
+ use cweagans\Composer\PatchEvents;
+ use Composer\Package\PackageInterface;
+
+-class PatchEventTest extends \PHPUnit_Framework_TestCase {
++class PatchEventTest extends TestCase {
+
+   /**
+    * Tests all the getters.
