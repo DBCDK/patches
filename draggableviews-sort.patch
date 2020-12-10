@@ -1,0 +1,16 @@
+index d724fa1..b0d13c7 100644
+--- a/draggableviews.module
++++ b/draggableviews.module
+@@ -237,12 +237,6 @@ function draggableviews_views_query_alter(ViewExecutable $view, QueryPluginBase
+         'value' => $view->id(),
+         'numeric' => FALSE,
+       ],
+-      [
+-        'field' => 'view_display',
+-        'operator' => '=',
+-        'value' => $view->current_display,
+-        'numeric' => FALSE,
+-      ],
+     ];
+   }
+ }
