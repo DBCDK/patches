@@ -1,0 +1,19 @@
+diff --git a/modules/user/user.module b/modules/user/user.module
+index dfa05978cb..b8bbdfd13d 100644
+--- a/modules/user/user.module
++++ b/modules/user/user.module
+@@ -1,4 +1,4 @@
+-<?php
++—<?php
+ 
+ /**
+  * @file
+@@ -2389,7 +2389,7 @@ function user_external_login_register($name, $module) {
+  */
+ function user_pass_reset_url($account) {
+   $timestamp = REQUEST_TIME;
+-  return url("user/reset/$account->uid/$timestamp/" . user_pass_rehash($account->pass, $timestamp, $account->login, $account->uid), array('absolute' => TRUE));
++  return url("user/reset/$account->uid/$timestamp/" . user_pass_rehash($account->pass, $timestamp, $account->login, $account->uid) . '/login', array('absolute' => TRUE));
+ }
+ 
+ /**
