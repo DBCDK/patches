@@ -1,0 +1,15 @@
+diff --git a/includes/common.inc b/includes/common.inc
+old mode 100644
+new mode 100755
+index 38ea92abea..6d3977f5a6
+--- a/includes/common.inc
++++ b/includes/common.inc
+@@ -4777,7 +4777,7 @@ function drupal_process_attached($elements, $group = JS_DEFAULT, $dependency_che
+       }
+       // In some cases, the first parameter ($data) is an array. Arrays can't be
+       // passed as keys in PHP, so we have to get $data from the value array.
+-      if (is_numeric($data)) {
++      if (is_numeric($data) && $options['data'] !== null) {
+         $data = $options['data'];
+         unset($options['data']);
+       }
