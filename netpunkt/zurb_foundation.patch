@@ -1,0 +1,38 @@
+diff --git a/template.php b/template.php
+old mode 100644
+new mode 100755
+index 8b1b1dc..04673ea
+--- a/template.php
++++ b/template.php
+@@ -795,13 +795,13 @@ function zurb_foundation_pager($variables) {
+   // Middle is used to "center" pages around the current page.
+   $pager_middle = ceil($quantity / 2);
+   // Current is the page we are currently paged to.
+-  $pager_current = $pager_page_array[$element] + 1;
++  $pager_current = $pager_page_array[$element] ?? 0 + 1;
+   // First is the first page listed by this pager piece (re-quantify).
+   $pager_first = $pager_current - $pager_middle + 1;
+   // Last is the last page listed by this pager piece (re-quantify)
+   $pager_last = $pager_current + $quantity - $pager_middle;
+   // Max is the maximum page number.
+-  $pager_max = $pager_total[$element];
++  $pager_max = $pager_total[$element] ?? 0;
+   // End of marker calculations.
+ 
+   // Prepare for generation loop.
+@@ -823,7 +823,7 @@ function zurb_foundation_pager($variables) {
+   $li_next = theme('pager_next', array('text' => (isset($tags[3]) ? $tags[3] : t('next ›')), 'element' => $element, 'interval' => 1, 'parameters' => $parameters));
+   $li_last = theme('pager_last', array('text' => (isset($tags[4]) ? $tags[4] : t('last »')), 'element' => $element, 'parameters' => $parameters));
+ 
+-  if ($pager_total[$element] > 1) {
++  if ($pager_max > 1) {
+     if ($li_first) {
+       $items[] = array(
+         'class' => array('arrow'),
+@@ -1371,4 +1371,4 @@ function zurb_foundation_links__split_button($variables) {
+   $output = _zurb_foundation_links($links);
+ 
+   return $primary_link . '<ul id="' . $id . '" class="f-dropdown" data-dropdown-content>' . $output . '</ul>';
+-}
+\ No newline at end of file
++}
