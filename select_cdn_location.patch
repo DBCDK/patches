@@ -1,0 +1,149 @@
+From 7a2b755da0a55e968984442bcee8519ae1225415 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Lars=20Krogsg=C3=A5rd=20Hansen?= <lkh@dbc.dk>
+Date: Fri, 8 Dec 2023 10:35:39 +0100
+Subject: [PATCH 1/2] Some european customers are not allowed to use CDN
+ outside EU, there we need an option for this in the admin system.
+
+---
+ cookiebot.admin.inc | 15 +++++++++++++++
+ cookiebot.install   |  7 +++++++
+ cookiebot.module    | 13 ++++++++-----
+ 3 files changed, 30 insertions(+), 5 deletions(-)
+
+diff --git a/cookiebot.admin.inc b/cookiebot.admin.inc
+index 3a9cafd..642267e 100644
+--- a/cookiebot.admin.inc
++++ b/cookiebot.admin.inc
+@@ -21,6 +21,9 @@
+ function cookiebot_settings_form($form, &$form_state) {
+   $cbid = variable_get('cookiebot_cbid', '');
+ 
++  $cdn_location_select_value = array('0' => t('Choose a CDN location'));
++  $cdn_locations = array_merge($cdn_location_select_value, variable_get('cookiebot_valid_cdn_locations'));
++
+   if (empty($cbid)) {
+     drupal_set_message(t('Cookiebot functionality is disabled until you enter a valid CBID.'), 'warning');
+   }
+@@ -32,6 +35,13 @@ function cookiebot_settings_form($form, &$form_state) {
+     '#default_value' => $cbid,
+   );
+ 
++  $form['cookiebot_cdn_location'] = array(
++    '#type' => 'select',
++    '#options' => $cdn_locations,
++    '#default_value' => variable_get('cookiebot_cdn_location', '-1'),
++    '#description' => t('We offer a strictly European based version of the Cookiebot CMP for our European customers.')
++  );
++
+   $form['cookiebot_block_cookies'] = [
+     '#type' => 'checkbox',
+     '#title' => t('Automatically block all cookies'),
+@@ -171,6 +181,11 @@ function cookiebot_settings_form_validate($form, &$form_state) {
+     form_set_error('cookiebot_cbid', t('The entered Domain Group ID is not formatted correctly.'));
+   }
+ 
++
++  if ($form_state['values']['cookiebot_cdn_location'] === '0') {
++    form_set_error('cookiebot_cdn_location', t('The chosen CDN location is not valid.'));
++  }
++
+   if (!empty($form_state['values']['cookiebot_show_declaration_node_id']) && !node_load($form_state['values']['cookiebot_show_declaration_node_id'])) {
+     form_set_error('cookiebot_show_declaration_node_id', t('The entered node ID is invalid.'));
+   }
+diff --git a/cookiebot.install b/cookiebot.install
+index 8a9bed3..7274ef0 100644
+--- a/cookiebot.install
++++ b/cookiebot.install
+@@ -37,3 +37,10 @@ function cookiebot_update_7002() {
+   $cookiebot_message_placeholder_cookieconsent_optout_marketing_text_default = 'Please <a href="!cookiebot_renew" class="cookieconsent-optout-marketing__cookiebot-renew">accept marketing-cookies</a> to view this embedded content from <a href="!cookiebot_from_src_url" target="_blank" class="cookieconsent-optout-marketing__from-src-url">!cookiebot_from_src_url</a>';
+   variable_set('cookiebot_message_placeholder_cookieconsent_optout_marketing', ['value'=> $cookiebot_message_placeholder_cookieconsent_optout_marketing_text_default, 'format' => filter_default_format()]);
+ }
++
++/**
++ * Add the variable for valid CDN locations
++ */
++function cookiebot_update_7003() {
++  variable_set('cookiebot_valid_cdn_locations', ['eu' => t('EU'), 'com' => t('US')]);
++}
+diff --git a/cookiebot.module b/cookiebot.module
+index 7ca16d1..c6ce28e 100644
+--- a/cookiebot.module
++++ b/cookiebot.module
+@@ -116,19 +116,20 @@ function cookiebot_preprocess_html(&$variables)
+   }
+ 
+   $cbid = variable_get('cookiebot_cbid', '');
++  $cdn_location = variable_get('cookiebot_cdn_location', 'com');
+   $attributes = [
+     'id' => 'Cookiebot',
+-    'src' => 'https://consent.cookiebot.com/uc.js',
++    'src' => 'https://consent.cookiebot.' . $cdn_location . '/uc.js',
+     'data-cbid' => check_plain($cbid),
+   ];
+ 
+-  if(variable_get('cookiebot_block_cookies')){
++  if(variable_get('cookiebot_block_cookies')) {
+     $attributes['data-blockingmode'] = 'auto';
+   } else {
+     $attributes['async'] = 'async';
+   }
+ 
+-  if(variable_get('cookiebot_iab_enabled')){
++  if(variable_get('cookiebot_iab_enabled')) {
+     $attributes['data-framework'] = 'IAB';
+   }
+ 
+@@ -204,9 +205,10 @@ function cookiebot_node_view_alter(&$build) {
+   }
+ 
+   // Print full cookies declaration from Cookiebot.
++  $cdn_location = variable_get('cookiebot_cdn_location', 'com');
+   $build['cookiebot'] = array(
+     '#theme' => 'cookiebot_declaration',
+-    '#cookiebot_src' => 'https://consent.cookiebot.com/' . $cbid . '/cd.js',
++    '#cookiebot_src' => 'https://consent.cookiebot.' . $cdn_location . '/' . $cbid . '/cd.js',
+   );
+ }
+ 
+@@ -261,9 +263,10 @@ function cookiebot_block_view($delta = '') {
+         break;
+       }
+ 
++      $cdn_location = variable_get('cookiebot_cdn_location', 'com');
+       $block['content'] = array(
+         '#theme' => 'cookiebot_declaration',
+-        '#cookiebot_src' => 'https://consent.cookiebot.com/' . $cbid . '/cd.js',
++        '#cookiebot_src' => 'https://consent.cookiebot.' . $cdn_location . '/' . $cbid . '/cd.js',
+       );
+       break;
+   }
+-- 
+2.42.1
+
+
+From 2284c244806b562ed115c2a0608060c0c57e628e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Lars=20Krogsg=C3=A5rd=20Hansen?= <lkh@dbc.dk>
+Date: Fri, 8 Dec 2023 10:37:39 +0100
+Subject: [PATCH 2/2] We need the zero to be the default value and not -1 which
+ does not exist
+
+---
+ cookiebot.admin.inc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/cookiebot.admin.inc b/cookiebot.admin.inc
+index 642267e..9e24e75 100644
+--- a/cookiebot.admin.inc
++++ b/cookiebot.admin.inc
+@@ -38,7 +38,7 @@ function cookiebot_settings_form($form, &$form_state) {
+   $form['cookiebot_cdn_location'] = array(
+     '#type' => 'select',
+     '#options' => $cdn_locations,
+-    '#default_value' => variable_get('cookiebot_cdn_location', '-1'),
++    '#default_value' => variable_get('cookiebot_cdn_location', '0'),
+     '#description' => t('We offer a strictly European based version of the Cookiebot CMP for our European customers.')
+   );
+ 
+-- 
+2.42.1
+
