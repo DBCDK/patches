@@ -1,11 +1,9 @@
-diff --git a/uuid_services/uuid_services.user_services.test b/uuid_services/uuid_services.user_services.test
-index 453b042..8d42fb3 100644
 --- uuid_services/uuid_services.user_services.test
 +++ uuid_services/uuid_services.user_services.test
 @@ -8,7 +8,7 @@
- /**
-  * Test the UUID User Services integration.
-  */
+  /**
+   * Test the UUID User Services integration.
+   */
 -class UuidUserServicesTest extends ServicesWebTestCase {
 +class UuidUserServicesTest extends DrupalUnitTestCase {
  
