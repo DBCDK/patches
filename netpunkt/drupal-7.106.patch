@@ -1,0 +1,1911 @@
+diff --git a/D7ES_CHANGELOG.txt b/D7ES_CHANGELOG.txt
+index 27e7b40..4995e9e 100644
+--- a/D7ES_CHANGELOG.txt
++++ b/D7ES_CHANGELOG.txt
+@@ -1,3 +1,7 @@
++Drupal 7.106, 2026-08-19
++------------------------
++- Security: Addresses information disclosure of image style derivatives stored on file schemes other than the core private scheme.
++
+ Drupal 7.105, 2025-10-01
+ ------------------------
+ - PHP 8.4 support
+diff --git a/includes/bootstrap.inc b/includes/bootstrap.inc
+index 30d652f..be87efe 100644
+--- a/includes/bootstrap.inc
++++ b/includes/bootstrap.inc
+@@ -8,7 +8,7 @@
+ /**
+  * The current system version.
+  */
+-define('VERSION', '7.105');
++define('VERSION', '7.106');
+ 
+ /**
+  * Core API compatibility.
+diff --git a/modules/aggregator/aggregator.info b/modules/aggregator/aggregator.info
+index 5e8929c..2fd7444 100644
+--- a/modules/aggregator/aggregator.info
++++ b/modules/aggregator/aggregator.info
+@@ -7,6 +7,6 @@ files[] = aggregator.test
+ configure = admin/config/services/aggregator/settings
+ stylesheets[all][] = aggregator.css
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/aggregator/tests/aggregator_test.info b/modules/aggregator/tests/aggregator_test.info
+index ee7033b..5ca6b7b 100644
+--- a/modules/aggregator/tests/aggregator_test.info
++++ b/modules/aggregator/tests/aggregator_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/announcements_feed/announcements_feed.info b/modules/announcements_feed/announcements_feed.info
+index b0a31e3..8852e18 100644
+--- a/modules/announcements_feed/announcements_feed.info
++++ b/modules/announcements_feed/announcements_feed.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ files[] = tests/announce_feed_test.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/announcements_feed/tests/announce_feed_test.info b/modules/announcements_feed/tests/announce_feed_test.info
+index 98c82d8..ba6bc1a 100644
+--- a/modules/announcements_feed/tests/announce_feed_test.info
++++ b/modules/announcements_feed/tests/announce_feed_test.info
+@@ -4,6 +4,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/block/block.info b/modules/block/block.info
+index 13d8d33..338f407 100644
+--- a/modules/block/block.info
++++ b/modules/block/block.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = block.test
+ configure = admin/structure/block
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/block/tests/block_test.info b/modules/block/tests/block_test.info
+index e01e960..2820b54 100644
+--- a/modules/block/tests/block_test.info
++++ b/modules/block/tests/block_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/block/tests/themes/block_test_theme/block_test_theme.info b/modules/block/tests/themes/block_test_theme/block_test_theme.info
+index 89863af..2f0af37 100644
+--- a/modules/block/tests/themes/block_test_theme/block_test_theme.info
++++ b/modules/block/tests/themes/block_test_theme/block_test_theme.info
+@@ -13,6 +13,6 @@ regions[footer] = Footer
+ regions[highlighted] = Highlighted
+ regions[help] = Help
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/blog/blog.info b/modules/blog/blog.info
+index 0423e0c..c6fb4fd 100644
+--- a/modules/blog/blog.info
++++ b/modules/blog/blog.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ files[] = blog.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/book/book.info b/modules/book/book.info
+index ce33202..5c83a97 100644
+--- a/modules/book/book.info
++++ b/modules/book/book.info
+@@ -7,6 +7,6 @@ files[] = book.test
+ configure = admin/content/book/settings
+ stylesheets[all][] = book.css
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/color/color.info b/modules/color/color.info
+index cde192e..46fb552 100644
+--- a/modules/color/color.info
++++ b/modules/color/color.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ files[] = color.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/comment/comment.info b/modules/comment/comment.info
+index 5578637..653ff74 100644
+--- a/modules/comment/comment.info
++++ b/modules/comment/comment.info
+@@ -9,6 +9,6 @@ files[] = comment.test
+ configure = admin/content/comment
+ stylesheets[all][] = comment.css
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/comment/tests/comment_hook_test.info b/modules/comment/tests/comment_hook_test.info
+index 8573951..121161c 100644
+--- a/modules/comment/tests/comment_hook_test.info
++++ b/modules/comment/tests/comment_hook_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/contact/contact.info b/modules/contact/contact.info
+index d23c250..ff16360 100644
+--- a/modules/contact/contact.info
++++ b/modules/contact/contact.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = contact.test
+ configure = admin/structure/contact
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/contextual/contextual.info b/modules/contextual/contextual.info
+index f8c6cec..4534190 100644
+--- a/modules/contextual/contextual.info
++++ b/modules/contextual/contextual.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ files[] = contextual.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/dashboard/dashboard.info b/modules/dashboard/dashboard.info
+index 0cde3d8..eab8277 100644
+--- a/modules/dashboard/dashboard.info
++++ b/modules/dashboard/dashboard.info
+@@ -7,6 +7,6 @@ files[] = dashboard.test
+ dependencies[] = block
+ configure = admin/dashboard/customize
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/dblog/dblog.info b/modules/dblog/dblog.info
+index 8967ef8..cfe71c9 100644
+--- a/modules/dblog/dblog.info
++++ b/modules/dblog/dblog.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ files[] = dblog.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/field/field.info b/modules/field/field.info
+index 86d5570..5908da1 100644
+--- a/modules/field/field.info
++++ b/modules/field/field.info
+@@ -11,6 +11,6 @@ dependencies[] = field_sql_storage
+ required = TRUE
+ stylesheets[all][] = theme/field.css
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/field/modules/field_sql_storage/field_sql_storage.info b/modules/field/modules/field_sql_storage/field_sql_storage.info
+index 7fed0bd..bc5c447 100644
+--- a/modules/field/modules/field_sql_storage/field_sql_storage.info
++++ b/modules/field/modules/field_sql_storage/field_sql_storage.info
+@@ -7,6 +7,6 @@ dependencies[] = field
+ files[] = field_sql_storage.test
+ required = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/field/modules/list/list.info b/modules/field/modules/list/list.info
+index e3aa6cb..8856706 100644
+--- a/modules/field/modules/list/list.info
++++ b/modules/field/modules/list/list.info
+@@ -7,6 +7,6 @@ dependencies[] = field
+ dependencies[] = options
+ files[] = tests/list.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/field/modules/list/tests/list_test.info b/modules/field/modules/list/tests/list_test.info
+index cb2722f..18db402 100644
+--- a/modules/field/modules/list/tests/list_test.info
++++ b/modules/field/modules/list/tests/list_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/field/modules/number/number.info b/modules/field/modules/number/number.info
+index 6aff6db..70b4b74 100644
+--- a/modules/field/modules/number/number.info
++++ b/modules/field/modules/number/number.info
+@@ -6,6 +6,6 @@ core = 7.x
+ dependencies[] = field
+ files[] = number.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/field/modules/options/options.info b/modules/field/modules/options/options.info
+index 76cbbff..c70a4cf 100644
+--- a/modules/field/modules/options/options.info
++++ b/modules/field/modules/options/options.info
+@@ -6,6 +6,6 @@ core = 7.x
+ dependencies[] = field
+ files[] = options.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/field/modules/text/text.info b/modules/field/modules/text/text.info
+index a028718..1d043c3 100644
+--- a/modules/field/modules/text/text.info
++++ b/modules/field/modules/text/text.info
+@@ -7,6 +7,6 @@ dependencies[] = field
+ files[] = text.test
+ required = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/field/tests/field_test.info b/modules/field/tests/field_test.info
+index d684a5f..28d7ed8 100644
+--- a/modules/field/tests/field_test.info
++++ b/modules/field/tests/field_test.info
+@@ -6,6 +6,6 @@ files[] = field_test.entity.inc
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/field/tests/field_test_schema_alter.info b/modules/field/tests/field_test_schema_alter.info
+index 8a2c113..271efe8 100644
+--- a/modules/field/tests/field_test_schema_alter.info
++++ b/modules/field/tests/field_test_schema_alter.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/field_ui/field_ui.info b/modules/field_ui/field_ui.info
+index c3becef..d99f165 100644
+--- a/modules/field_ui/field_ui.info
++++ b/modules/field_ui/field_ui.info
+@@ -6,6 +6,6 @@ core = 7.x
+ dependencies[] = field
+ files[] = field_ui.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/file/file.info b/modules/file/file.info
+index 44b0882..a430f87 100644
+--- a/modules/file/file.info
++++ b/modules/file/file.info
+@@ -6,6 +6,6 @@ core = 7.x
+ dependencies[] = field
+ files[] = tests/file.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/file/tests/file_module_test.info b/modules/file/tests/file_module_test.info
+index bdb8422..bec9053 100644
+--- a/modules/file/tests/file_module_test.info
++++ b/modules/file/tests/file_module_test.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/filter/filter.info b/modules/filter/filter.info
+index 6df04fc..34a3a25 100644
+--- a/modules/filter/filter.info
++++ b/modules/filter/filter.info
+@@ -7,6 +7,6 @@ files[] = filter.test
+ required = TRUE
+ configure = admin/config/content/formats
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/forum/forum.info b/modules/forum/forum.info
+index 2deb487..04511f4 100644
+--- a/modules/forum/forum.info
++++ b/modules/forum/forum.info
+@@ -9,6 +9,6 @@ files[] = forum.test
+ configure = admin/structure/forum
+ stylesheets[all][] = forum.css
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/help/help.info b/modules/help/help.info
+index d6071b0..b57f5cb 100644
+--- a/modules/help/help.info
++++ b/modules/help/help.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ files[] = help.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/image/image.info b/modules/image/image.info
+index f7d5813..258a30c 100644
+--- a/modules/image/image.info
++++ b/modules/image/image.info
+@@ -7,6 +7,6 @@ dependencies[] = file
+ files[] = image.test
+ configure = admin/config/media/image-styles
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/image/image.module b/modules/image/image.module
+index f18e005..ee03eeb 100644
+--- a/modules/image/image.module
++++ b/modules/image/image.module
+@@ -857,17 +857,12 @@ function image_style_deliver($style, $scheme = NULL) {
+   $derivative_uri = image_style_path($style['name'], $image_uri);
+   $derivative_scheme = file_uri_scheme($derivative_uri);
+ 
+-  if ($token_is_valid) {
+-    $is_public = ($scheme !== 'private');
+-  }
+-  else {
+-    $core_schemes = array('public', 'private', 'temporary');
+-    $additional_public_schemes = array_diff(variable_get('file_additional_public_schemes', array()), $core_schemes);
+-    $public_schemes = array_merge(array('public'), $additional_public_schemes);
+-    $is_public = in_array($derivative_scheme, $public_schemes, TRUE);
+-  }
++  $core_schemes = array('public', 'private', 'temporary');
++  $additional_public_schemes = array_diff(variable_get('file_additional_public_schemes', array()), $core_schemes);
++  $public_schemes = array_merge(array('public'), $additional_public_schemes);
++  $is_public = in_array($derivative_scheme, $public_schemes, TRUE);
+ 
+-  if ($scheme == 'private' && file_exists($derivative_uri)) {
++  if (!$is_public && file_exists($derivative_uri)) {
+     file_download($scheme, file_uri_target($derivative_uri));
+   }
+ 
+diff --git a/modules/image/tests/image_module_styles_test.info b/modules/image/tests/image_module_styles_test.info
+index 05200a3..98a175e 100644
+--- a/modules/image/tests/image_module_styles_test.info
++++ b/modules/image/tests/image_module_styles_test.info
+@@ -7,6 +7,6 @@ files[] = image_module_styles_test.module
+ dependencies[] = image_module_test
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/image/tests/image_module_test.info b/modules/image/tests/image_module_test.info
+index 16a0b8f..0636d84 100644
+--- a/modules/image/tests/image_module_test.info
++++ b/modules/image/tests/image_module_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = image_module_test.module
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/locale/locale.info b/modules/locale/locale.info
+index 277dc9f..1ba6121 100644
+--- a/modules/locale/locale.info
++++ b/modules/locale/locale.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = locale.test
+ configure = admin/config/regional/language
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/locale/tests/locale_test.info b/modules/locale/tests/locale_test.info
+index 22a54c7..3701d8c 100644
+--- a/modules/locale/tests/locale_test.info
++++ b/modules/locale/tests/locale_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/menu/menu.info b/modules/menu/menu.info
+index 118dcd1..1f5127d 100644
+--- a/modules/menu/menu.info
++++ b/modules/menu/menu.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = menu.test
+ configure = admin/structure/menu
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/node/node.info b/modules/node/node.info
+index 1585800..80ac9bc 100644
+--- a/modules/node/node.info
++++ b/modules/node/node.info
+@@ -9,6 +9,6 @@ required = TRUE
+ configure = admin/structure/types
+ stylesheets[all][] = node.css
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/node/tests/node_access_test.info b/modules/node/tests/node_access_test.info
+index a75b732..a77ba34 100644
+--- a/modules/node/tests/node_access_test.info
++++ b/modules/node/tests/node_access_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/node/tests/node_test.info b/modules/node/tests/node_test.info
+index 3b97e66..0bec9c4 100644
+--- a/modules/node/tests/node_test.info
++++ b/modules/node/tests/node_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/node/tests/node_test_exception.info b/modules/node/tests/node_test_exception.info
+index 6cf7608..f460e55 100644
+--- a/modules/node/tests/node_test_exception.info
++++ b/modules/node/tests/node_test_exception.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/openid/openid.info b/modules/openid/openid.info
+index 7c19bf8..fb1c23a 100644
+--- a/modules/openid/openid.info
++++ b/modules/openid/openid.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ files[] = openid.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/openid/tests/openid_test.info b/modules/openid/tests/openid_test.info
+index a299115..30345de 100644
+--- a/modules/openid/tests/openid_test.info
++++ b/modules/openid/tests/openid_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ dependencies[] = openid
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/overlay/overlay.info b/modules/overlay/overlay.info
+index 8cb33c2..1817674 100644
+--- a/modules/overlay/overlay.info
++++ b/modules/overlay/overlay.info
+@@ -4,6 +4,6 @@ package = Core
+ # version = VERSION
+ core = 7.x
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/path/path.info b/modules/path/path.info
+index 81f6b76..39d4d11 100644
+--- a/modules/path/path.info
++++ b/modules/path/path.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = path.test
+ configure = admin/config/search/path
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/php/php.info b/modules/php/php.info
+index 490b3b8..f6a7aad 100644
+--- a/modules/php/php.info
++++ b/modules/php/php.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ files[] = php.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/poll/poll.info b/modules/poll/poll.info
+index 8592411..e595769 100644
+--- a/modules/poll/poll.info
++++ b/modules/poll/poll.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = poll.test
+ stylesheets[all][] = poll.css
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/profile/profile.info b/modules/profile/profile.info
+index aecf624..891d211 100644
+--- a/modules/profile/profile.info
++++ b/modules/profile/profile.info
+@@ -11,6 +11,6 @@ configure = admin/config/people/profile
+ ; See user_system_info_alter().
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/rdf/rdf.info b/modules/rdf/rdf.info
+index c35ae86..50b21ca 100644
+--- a/modules/rdf/rdf.info
++++ b/modules/rdf/rdf.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ files[] = rdf.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/rdf/tests/rdf_test.info b/modules/rdf/tests/rdf_test.info
+index 8794de7..6b42fc1 100644
+--- a/modules/rdf/tests/rdf_test.info
++++ b/modules/rdf/tests/rdf_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ hidden = TRUE
+ dependencies[] = blog
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/search/search.info b/modules/search/search.info
+index b719324..88060dd 100644
+--- a/modules/search/search.info
++++ b/modules/search/search.info
+@@ -8,6 +8,6 @@ files[] = search.test
+ configure = admin/config/search/settings
+ stylesheets[all][] = search.css
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/search/tests/search_embedded_form.info b/modules/search/tests/search_embedded_form.info
+index 36562ee..7e2595d 100644
+--- a/modules/search/tests/search_embedded_form.info
++++ b/modules/search/tests/search_embedded_form.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/search/tests/search_extra_type.info b/modules/search/tests/search_extra_type.info
+index 9b1082d..3d57583 100644
+--- a/modules/search/tests/search_extra_type.info
++++ b/modules/search/tests/search_extra_type.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/search/tests/search_node_tags.info b/modules/search/tests/search_node_tags.info
+index 6b67d2e..c18f075 100644
+--- a/modules/search/tests/search_node_tags.info
++++ b/modules/search/tests/search_node_tags.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/shortcut/shortcut.info b/modules/shortcut/shortcut.info
+index 0cc7f8d..a54b611 100644
+--- a/modules/shortcut/shortcut.info
++++ b/modules/shortcut/shortcut.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = shortcut.test
+ configure = admin/config/user-interface/shortcut
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/simpletest.info b/modules/simpletest/simpletest.info
+index 10ad17a..9bfa8a3 100644
+--- a/modules/simpletest/simpletest.info
++++ b/modules/simpletest/simpletest.info
+@@ -58,6 +58,6 @@ files[] = tests/upgrade/update.trigger.test
+ files[] = tests/upgrade/update.field.test
+ files[] = tests/upgrade/update.user.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/actions_loop_test.info b/modules/simpletest/tests/actions_loop_test.info
+index 096de65..e0ff1bd 100644
+--- a/modules/simpletest/tests/actions_loop_test.info
++++ b/modules/simpletest/tests/actions_loop_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/ajax_forms_test.info b/modules/simpletest/tests/ajax_forms_test.info
+index 8472b9c..c64e4ae 100644
+--- a/modules/simpletest/tests/ajax_forms_test.info
++++ b/modules/simpletest/tests/ajax_forms_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/ajax_test.info b/modules/simpletest/tests/ajax_test.info
+index f762f69..51ee08d 100644
+--- a/modules/simpletest/tests/ajax_test.info
++++ b/modules/simpletest/tests/ajax_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/batch_test.info b/modules/simpletest/tests/batch_test.info
+index 8773060..866dd67 100644
+--- a/modules/simpletest/tests/batch_test.info
++++ b/modules/simpletest/tests/batch_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/boot_test_1.info b/modules/simpletest/tests/boot_test_1.info
+index 2681801..2aa6a4a 100644
+--- a/modules/simpletest/tests/boot_test_1.info
++++ b/modules/simpletest/tests/boot_test_1.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/boot_test_2.info b/modules/simpletest/tests/boot_test_2.info
+index 8eaf085..f51db91 100644
+--- a/modules/simpletest/tests/boot_test_2.info
++++ b/modules/simpletest/tests/boot_test_2.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/common_test.info b/modules/simpletest/tests/common_test.info
+index 21bdf28..278595f 100644
+--- a/modules/simpletest/tests/common_test.info
++++ b/modules/simpletest/tests/common_test.info
+@@ -7,6 +7,6 @@ stylesheets[all][] = common_test.css
+ stylesheets[print][] = common_test.print.css
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/common_test_cron_helper.info b/modules/simpletest/tests/common_test_cron_helper.info
+index e6efb25..60abd10 100644
+--- a/modules/simpletest/tests/common_test_cron_helper.info
++++ b/modules/simpletest/tests/common_test_cron_helper.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/database_test.info b/modules/simpletest/tests/database_test.info
+index 3462adc..edcf9d7 100644
+--- a/modules/simpletest/tests/database_test.info
++++ b/modules/simpletest/tests/database_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/drupal_autoload_test/drupal_autoload_test.info b/modules/simpletest/tests/drupal_autoload_test/drupal_autoload_test.info
+index b7bb452..68b2148 100644
+--- a/modules/simpletest/tests/drupal_autoload_test/drupal_autoload_test.info
++++ b/modules/simpletest/tests/drupal_autoload_test/drupal_autoload_test.info
+@@ -7,6 +7,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info b/modules/simpletest/tests/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
+index fbc4127..4a6c86f 100644
+--- a/modules/simpletest/tests/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
++++ b/modules/simpletest/tests/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info b/modules/simpletest/tests/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
+index c97c45d..85295b6 100644
+--- a/modules/simpletest/tests/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
++++ b/modules/simpletest/tests/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/entity_cache_test.info b/modules/simpletest/tests/entity_cache_test.info
+index 55846ea..68d6902 100644
+--- a/modules/simpletest/tests/entity_cache_test.info
++++ b/modules/simpletest/tests/entity_cache_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ dependencies[] = entity_cache_test_dependency
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/entity_cache_test_dependency.info b/modules/simpletest/tests/entity_cache_test_dependency.info
+index 5cf7eda..7f5e024 100644
+--- a/modules/simpletest/tests/entity_cache_test_dependency.info
++++ b/modules/simpletest/tests/entity_cache_test_dependency.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/entity_crud_hook_test.info b/modules/simpletest/tests/entity_crud_hook_test.info
+index 4101dab..d35d85c 100644
+--- a/modules/simpletest/tests/entity_crud_hook_test.info
++++ b/modules/simpletest/tests/entity_crud_hook_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/entity_query_access_test.info b/modules/simpletest/tests/entity_query_access_test.info
+index bb97fbf..d6a5d59 100644
+--- a/modules/simpletest/tests/entity_query_access_test.info
++++ b/modules/simpletest/tests/entity_query_access_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/error_test.info b/modules/simpletest/tests/error_test.info
+index a153bad..4a97aed 100644
+--- a/modules/simpletest/tests/error_test.info
++++ b/modules/simpletest/tests/error_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/file_test.info b/modules/simpletest/tests/file_test.info
+index 978d36e..33a29e1 100644
+--- a/modules/simpletest/tests/file_test.info
++++ b/modules/simpletest/tests/file_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = file_test.module
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/filter_test.info b/modules/simpletest/tests/filter_test.info
+index 8e418b8..d58155f 100644
+--- a/modules/simpletest/tests/filter_test.info
++++ b/modules/simpletest/tests/filter_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/form_test.info b/modules/simpletest/tests/form_test.info
+index 7e24d7a..1c33f4d 100644
+--- a/modules/simpletest/tests/form_test.info
++++ b/modules/simpletest/tests/form_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/image_test.info b/modules/simpletest/tests/image_test.info
+index 813b404..7d96d3c 100644
+--- a/modules/simpletest/tests/image_test.info
++++ b/modules/simpletest/tests/image_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/menu_test.info b/modules/simpletest/tests/menu_test.info
+index 161733a..6a4fac0 100644
+--- a/modules/simpletest/tests/menu_test.info
++++ b/modules/simpletest/tests/menu_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/module_test.info b/modules/simpletest/tests/module_test.info
+index 30192c4..06f3870 100644
+--- a/modules/simpletest/tests/module_test.info
++++ b/modules/simpletest/tests/module_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/path_test.info b/modules/simpletest/tests/path_test.info
+index 419624e..f33c2e1 100644
+--- a/modules/simpletest/tests/path_test.info
++++ b/modules/simpletest/tests/path_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/psr_0_test/psr_0_test.info b/modules/simpletest/tests/psr_0_test/psr_0_test.info
+index 3642016..9653ea7 100644
+--- a/modules/simpletest/tests/psr_0_test/psr_0_test.info
++++ b/modules/simpletest/tests/psr_0_test/psr_0_test.info
+@@ -5,6 +5,6 @@ core = 7.x
+ hidden = TRUE
+ package = Testing
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/psr_4_test/psr_4_test.info b/modules/simpletest/tests/psr_4_test/psr_4_test.info
+index 2586a1d..93253dd 100644
+--- a/modules/simpletest/tests/psr_4_test/psr_4_test.info
++++ b/modules/simpletest/tests/psr_4_test/psr_4_test.info
+@@ -5,6 +5,6 @@ core = 7.x
+ hidden = TRUE
+ package = Testing
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/requirements1_test.info b/modules/simpletest/tests/requirements1_test.info
+index 3d57c0e..3312482 100644
+--- a/modules/simpletest/tests/requirements1_test.info
++++ b/modules/simpletest/tests/requirements1_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/requirements2_test.info b/modules/simpletest/tests/requirements2_test.info
+index a0b2c08..b9cb893 100644
+--- a/modules/simpletest/tests/requirements2_test.info
++++ b/modules/simpletest/tests/requirements2_test.info
+@@ -7,6 +7,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/session_test.info b/modules/simpletest/tests/session_test.info
+index 7b9b7a5..ae32276 100644
+--- a/modules/simpletest/tests/session_test.info
++++ b/modules/simpletest/tests/session_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_admin_test.info b/modules/simpletest/tests/system_admin_test.info
+index 6274642..97b7d46 100644
+--- a/modules/simpletest/tests/system_admin_test.info
++++ b/modules/simpletest/tests/system_admin_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ hidden = FALSE
+ configure = config/broken
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_dependencies_test.info b/modules/simpletest/tests/system_dependencies_test.info
+index 1bd7729..f3dec4e 100644
+--- a/modules/simpletest/tests/system_dependencies_test.info
++++ b/modules/simpletest/tests/system_dependencies_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ hidden = TRUE
+ dependencies[] = _missing_dependency
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_incompatible_core_version_dependencies_test.info b/modules/simpletest/tests/system_incompatible_core_version_dependencies_test.info
+index 2c37034..8db437f 100644
+--- a/modules/simpletest/tests/system_incompatible_core_version_dependencies_test.info
++++ b/modules/simpletest/tests/system_incompatible_core_version_dependencies_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ hidden = TRUE
+ dependencies[] = system_incompatible_core_version_test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_incompatible_core_version_test.info b/modules/simpletest/tests/system_incompatible_core_version_test.info
+index 64495b3..ddc7317 100644
+--- a/modules/simpletest/tests/system_incompatible_core_version_test.info
++++ b/modules/simpletest/tests/system_incompatible_core_version_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 5.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_incompatible_module_version_dependencies_test.info b/modules/simpletest/tests/system_incompatible_module_version_dependencies_test.info
+index 233909f..51ed0be 100644
+--- a/modules/simpletest/tests/system_incompatible_module_version_dependencies_test.info
++++ b/modules/simpletest/tests/system_incompatible_module_version_dependencies_test.info
+@@ -7,6 +7,6 @@ hidden = TRUE
+ ; system_incompatible_module_version_test declares version 1.0
+ dependencies[] = system_incompatible_module_version_test (>2.0)
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_incompatible_module_version_test.info b/modules/simpletest/tests/system_incompatible_module_version_test.info
+index 6e28d14..6ffe545 100644
+--- a/modules/simpletest/tests/system_incompatible_module_version_test.info
++++ b/modules/simpletest/tests/system_incompatible_module_version_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_null_version_test.info b/modules/simpletest/tests/system_null_version_test.info
+index cebe4e3..4db2adc 100644
+--- a/modules/simpletest/tests/system_null_version_test.info
++++ b/modules/simpletest/tests/system_null_version_test.info
+@@ -4,6 +4,6 @@ package = Only For Testing
+ core = 7.x
+ hidden = FALSE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_project_namespace_test.info b/modules/simpletest/tests/system_project_namespace_test.info
+index 48e9118..a7bdc0e 100644
+--- a/modules/simpletest/tests/system_project_namespace_test.info
++++ b/modules/simpletest/tests/system_project_namespace_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ hidden = TRUE
+ dependencies[] = drupal:filter
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_requires_null_version_test.info b/modules/simpletest/tests/system_requires_null_version_test.info
+index 136b13a..d33d7c0 100644
+--- a/modules/simpletest/tests/system_requires_null_version_test.info
++++ b/modules/simpletest/tests/system_requires_null_version_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ hidden = FALSE
+ dependencies[] = system_null_version_test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_test.info b/modules/simpletest/tests/system_test.info
+index dc3b448..6e4b697 100644
+--- a/modules/simpletest/tests/system_test.info
++++ b/modules/simpletest/tests/system_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = system_test.module
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/taxonomy_nodes_test.info b/modules/simpletest/tests/taxonomy_nodes_test.info
+index 2326ec3..4bbe67c 100644
+--- a/modules/simpletest/tests/taxonomy_nodes_test.info
++++ b/modules/simpletest/tests/taxonomy_nodes_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/taxonomy_test.info b/modules/simpletest/tests/taxonomy_test.info
+index 3b4c540..db0c4aa 100644
+--- a/modules/simpletest/tests/taxonomy_test.info
++++ b/modules/simpletest/tests/taxonomy_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ hidden = TRUE
+ dependencies[] = taxonomy
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/theme_test.info b/modules/simpletest/tests/theme_test.info
+index 633ed06..1181a66 100644
+--- a/modules/simpletest/tests/theme_test.info
++++ b/modules/simpletest/tests/theme_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/themes/test_basetheme/test_basetheme.info b/modules/simpletest/tests/themes/test_basetheme/test_basetheme.info
+index b0905f3..8092e57 100644
+--- a/modules/simpletest/tests/themes/test_basetheme/test_basetheme.info
++++ b/modules/simpletest/tests/themes/test_basetheme/test_basetheme.info
+@@ -6,6 +6,6 @@ hidden = TRUE
+ settings[basetheme_only] = base theme value
+ settings[subtheme_override] = base theme value
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/themes/test_subtheme/test_subtheme.info b/modules/simpletest/tests/themes/test_subtheme/test_subtheme.info
+index 50db812..76a741b 100644
+--- a/modules/simpletest/tests/themes/test_subtheme/test_subtheme.info
++++ b/modules/simpletest/tests/themes/test_subtheme/test_subtheme.info
+@@ -6,6 +6,6 @@ hidden = TRUE
+ 
+ settings[subtheme_override] = subtheme value
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/themes/test_theme/test_theme.info b/modules/simpletest/tests/themes/test_theme/test_theme.info
+index 3025acf..8958675 100644
+--- a/modules/simpletest/tests/themes/test_theme/test_theme.info
++++ b/modules/simpletest/tests/themes/test_theme/test_theme.info
+@@ -17,6 +17,6 @@ stylesheets[all][] = system.base.css
+ 
+ settings[theme_test_setting] = default value
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/themes/test_theme_nyan_cat/test_theme_nyan_cat.info b/modules/simpletest/tests/themes/test_theme_nyan_cat/test_theme_nyan_cat.info
+index 08fd5cd..a306ea0 100644
+--- a/modules/simpletest/tests/themes/test_theme_nyan_cat/test_theme_nyan_cat.info
++++ b/modules/simpletest/tests/themes/test_theme_nyan_cat/test_theme_nyan_cat.info
+@@ -4,6 +4,6 @@ core = 7.x
+ hidden = TRUE
+ engine = nyan_cat
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/update_script_test.info b/modules/simpletest/tests/update_script_test.info
+index a225ff4..735b11b 100644
+--- a/modules/simpletest/tests/update_script_test.info
++++ b/modules/simpletest/tests/update_script_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/update_test_1.info b/modules/simpletest/tests/update_test_1.info
+index f459e33..3ce6e0f 100644
+--- a/modules/simpletest/tests/update_test_1.info
++++ b/modules/simpletest/tests/update_test_1.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/update_test_2.info b/modules/simpletest/tests/update_test_2.info
+index f459e33..3ce6e0f 100644
+--- a/modules/simpletest/tests/update_test_2.info
++++ b/modules/simpletest/tests/update_test_2.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/update_test_3.info b/modules/simpletest/tests/update_test_3.info
+index f459e33..3ce6e0f 100644
+--- a/modules/simpletest/tests/update_test_3.info
++++ b/modules/simpletest/tests/update_test_3.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/url_alter_test.info b/modules/simpletest/tests/url_alter_test.info
+index 2b778c9..02c6a0a 100644
+--- a/modules/simpletest/tests/url_alter_test.info
++++ b/modules/simpletest/tests/url_alter_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/xmlrpc_test.info b/modules/simpletest/tests/xmlrpc_test.info
+index b85a63a..821f0f3 100644
+--- a/modules/simpletest/tests/xmlrpc_test.info
++++ b/modules/simpletest/tests/xmlrpc_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/statistics/statistics.info b/modules/statistics/statistics.info
+index 1a50652..f1210d8 100644
+--- a/modules/statistics/statistics.info
++++ b/modules/statistics/statistics.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = statistics.test
+ configure = admin/config/system/statistics
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/syslog/syslog.info b/modules/syslog/syslog.info
+index bf7fe34..a476978 100644
+--- a/modules/syslog/syslog.info
++++ b/modules/syslog/syslog.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = syslog.test
+ configure = admin/config/development/logging
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/system/system.info b/modules/system/system.info
+index 0a045c1..987f0c4 100644
+--- a/modules/system/system.info
++++ b/modules/system/system.info
+@@ -12,6 +12,6 @@ files[] = system.test
+ required = TRUE
+ configure = admin/config/system
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/system/tests/cron_queue_test.info b/modules/system/tests/cron_queue_test.info
+index b489a7e..3f0b552 100644
+--- a/modules/system/tests/cron_queue_test.info
++++ b/modules/system/tests/cron_queue_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/system/tests/system_cron_test.info b/modules/system/tests/system_cron_test.info
+index 315419a..6cffb0f 100644
+--- a/modules/system/tests/system_cron_test.info
++++ b/modules/system/tests/system_cron_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/taxonomy/taxonomy.info b/modules/taxonomy/taxonomy.info
+index 0a8833d..37550b6 100644
+--- a/modules/taxonomy/taxonomy.info
++++ b/modules/taxonomy/taxonomy.info
+@@ -8,6 +8,6 @@ files[] = taxonomy.module
+ files[] = taxonomy.test
+ configure = admin/structure/taxonomy
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/toolbar/toolbar.info b/modules/toolbar/toolbar.info
+index ae5cf26..6bb238e 100644
+--- a/modules/toolbar/toolbar.info
++++ b/modules/toolbar/toolbar.info
+@@ -5,6 +5,6 @@ package = Core
+ # version = VERSION
+ files[] = toolbar.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/tracker/tracker.info b/modules/tracker/tracker.info
+index c82e781..b97d5f9 100644
+--- a/modules/tracker/tracker.info
++++ b/modules/tracker/tracker.info
+@@ -6,6 +6,6 @@ package = Core
+ core = 7.x
+ files[] = tracker.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/translation/tests/translation_test.info b/modules/translation/tests/translation_test.info
+index 37f0f05..9dde41b 100644
+--- a/modules/translation/tests/translation_test.info
++++ b/modules/translation/tests/translation_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ # version = VERSION
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/translation/translation.info b/modules/translation/translation.info
+index d19e039..61d9ed2 100644
+--- a/modules/translation/translation.info
++++ b/modules/translation/translation.info
+@@ -6,6 +6,6 @@ package = Core
+ core = 7.x
+ files[] = translation.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/trigger/tests/trigger_test.info b/modules/trigger/tests/trigger_test.info
+index 98a56e4..390c5ce 100644
+--- a/modules/trigger/tests/trigger_test.info
++++ b/modules/trigger/tests/trigger_test.info
+@@ -4,6 +4,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/trigger/trigger.info b/modules/trigger/trigger.info
+index 810ac14..70ccbab 100644
+--- a/modules/trigger/trigger.info
++++ b/modules/trigger/trigger.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = trigger.test
+ configure = admin/structure/trigger
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/update/tests/aaa_update_test.info b/modules/update/tests/aaa_update_test.info
+index 4d04487..1a6964f 100644
+--- a/modules/update/tests/aaa_update_test.info
++++ b/modules/update/tests/aaa_update_test.info
+@@ -4,6 +4,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/update/tests/bbb_update_test.info b/modules/update/tests/bbb_update_test.info
+index 8167ee0..2ab1582 100644
+--- a/modules/update/tests/bbb_update_test.info
++++ b/modules/update/tests/bbb_update_test.info
+@@ -4,6 +4,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/update/tests/ccc_update_test.info b/modules/update/tests/ccc_update_test.info
+index 9cc23ac..8ef1647 100644
+--- a/modules/update/tests/ccc_update_test.info
++++ b/modules/update/tests/ccc_update_test.info
+@@ -4,6 +4,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/update/tests/themes/update_test_admintheme/update_test_admintheme.info b/modules/update/tests/themes/update_test_admintheme/update_test_admintheme.info
+index 8257ae9..f2c9633 100644
+--- a/modules/update/tests/themes/update_test_admintheme/update_test_admintheme.info
++++ b/modules/update/tests/themes/update_test_admintheme/update_test_admintheme.info
+@@ -3,6 +3,6 @@ description = Test theme which is used as admin theme.
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/update/tests/themes/update_test_basetheme/update_test_basetheme.info b/modules/update/tests/themes/update_test_basetheme/update_test_basetheme.info
+index a6397e8..fd92cc3 100644
+--- a/modules/update/tests/themes/update_test_basetheme/update_test_basetheme.info
++++ b/modules/update/tests/themes/update_test_basetheme/update_test_basetheme.info
+@@ -3,6 +3,6 @@ description = Test theme which acts as a base theme for other test subthemes.
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/update/tests/themes/update_test_subtheme/update_test_subtheme.info b/modules/update/tests/themes/update_test_subtheme/update_test_subtheme.info
+index 8130f84..6db9fc5 100644
+--- a/modules/update/tests/themes/update_test_subtheme/update_test_subtheme.info
++++ b/modules/update/tests/themes/update_test_subtheme/update_test_subtheme.info
+@@ -4,6 +4,6 @@ core = 7.x
+ base theme = update_test_basetheme
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/update/tests/update_test.info b/modules/update/tests/update_test.info
+index 1e68227..b5c3129 100644
+--- a/modules/update/tests/update_test.info
++++ b/modules/update/tests/update_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/update/update.info b/modules/update/update.info
+index ad54f16..7c8f4cf 100644
+--- a/modules/update/update.info
++++ b/modules/update/update.info
+@@ -6,6 +6,6 @@ core = 7.x
+ files[] = update.test
+ configure = admin/reports/updates/settings
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/user/tests/anonymous_user_unblock_test.info b/modules/user/tests/anonymous_user_unblock_test.info
+index becfc58..9f95ee4 100644
+--- a/modules/user/tests/anonymous_user_unblock_test.info
++++ b/modules/user/tests/anonymous_user_unblock_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/user/tests/user_email_validation_test.info b/modules/user/tests/user_email_validation_test.info
+index 600ec89..887023c 100644
+--- a/modules/user/tests/user_email_validation_test.info
++++ b/modules/user/tests/user_email_validation_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/user/tests/user_flood_test.info b/modules/user/tests/user_flood_test.info
+index 2592d98..3b3f11f 100644
+--- a/modules/user/tests/user_flood_test.info
++++ b/modules/user/tests/user_flood_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/user/tests/user_form_test.info b/modules/user/tests/user_form_test.info
+index 256b271..8e75a0b 100644
+--- a/modules/user/tests/user_form_test.info
++++ b/modules/user/tests/user_form_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/user/tests/user_session_test.info b/modules/user/tests/user_session_test.info
+index 5ab17d8..ae62fdc 100644
+--- a/modules/user/tests/user_session_test.info
++++ b/modules/user/tests/user_session_test.info
+@@ -5,6 +5,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/modules/user/user.info b/modules/user/user.info
+index 75c7f0f..3890576 100644
+--- a/modules/user/user.info
++++ b/modules/user/user.info
+@@ -9,6 +9,6 @@ required = TRUE
+ configure = admin/config/people
+ stylesheets[all][] = user.css
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/profiles/minimal/minimal.info b/profiles/minimal/minimal.info
+index 86d1acb..c200ca7 100644
+--- a/profiles/minimal/minimal.info
++++ b/profiles/minimal/minimal.info
+@@ -5,6 +5,6 @@ core = 7.x
+ dependencies[] = block
+ dependencies[] = dblog
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/profiles/standard/standard.info b/profiles/standard/standard.info
+index 96fdb56..37654aa 100644
+--- a/profiles/standard/standard.info
++++ b/profiles/standard/standard.info
+@@ -24,6 +24,6 @@ dependencies[] = field_ui
+ dependencies[] = file
+ dependencies[] = rdf
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/profiles/testing/modules/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info b/profiles/testing/modules/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
+index 2ed3fe7..0103ba9 100644
+--- a/profiles/testing/modules/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
++++ b/profiles/testing/modules/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
+@@ -6,6 +6,6 @@ core = 7.x
+ hidden = TRUE
+ files[] = drupal_system_listing_compatible_test.test
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/profiles/testing/modules/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info b/profiles/testing/modules/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
+index 8e3ec48..766dbcd 100644
+--- a/profiles/testing/modules/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
++++ b/profiles/testing/modules/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
+@@ -8,6 +8,6 @@ package = Testing
+ core = 6.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/profiles/testing/testing.info b/profiles/testing/testing.info
+index bfeba9c..2fbce46 100644
+--- a/profiles/testing/testing.info
++++ b/profiles/testing/testing.info
+@@ -4,6 +4,6 @@ description = Minimal profile for running tests. Includes absolutely required mo
+ core = 7.x
+ hidden = TRUE
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/themes/bartik/bartik.info b/themes/bartik/bartik.info
+index 34926de..5d603bf 100644
+--- a/themes/bartik/bartik.info
++++ b/themes/bartik/bartik.info
+@@ -34,6 +34,6 @@ regions[footer] = Footer
+ settings[shortcut_module_link] = 0
+ 
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/themes/garland/garland.info b/themes/garland/garland.info
+index 1aedb51..d6e38cc 100644
+--- a/themes/garland/garland.info
++++ b/themes/garland/garland.info
+@@ -7,6 +7,6 @@ stylesheets[all][] = style.css
+ stylesheets[print][] = print.css
+ settings[garland_width] = fluid
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/themes/seven/seven.info b/themes/seven/seven.info
+index 8e4c124..fe56d4c 100644
+--- a/themes/seven/seven.info
++++ b/themes/seven/seven.info
+@@ -13,6 +13,6 @@ regions[page_bottom] = Page bottom
+ regions[sidebar_first] = First sidebar
+ regions_hidden[] = sidebar_first
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
+diff --git a/themes/stark/stark.info b/themes/stark/stark.info
+index 6f1b6c6..1f8fff8 100644
+--- a/themes/stark/stark.info
++++ b/themes/stark/stark.info
+@@ -5,6 +5,6 @@ package = Core
+ core = 7.x
+ stylesheets[all][] = layout.css
+ 
+-version = 7.105
++version = 7.106
+ project = drupal
+-datestamp = 1759347205
++datestamp = 1787164245
