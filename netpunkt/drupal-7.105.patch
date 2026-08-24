@@ -25,7 +25,7 @@ index da509c4c6b8..ba6b090babc 100644
 +      - "templates/package_release/package_release.yml"
 +
  ################
- # Include
+ # Workflow
  #
 @@ -39,6 +46,8 @@ workflow:
      - if: $CI_PIPELINE_SOURCE == "web"
