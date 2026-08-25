@@ -1,0 +1,3440 @@
+diff --git a/.gitignore b/.gitignore
+index baff153..fa6cd2b 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -4,3 +4,6 @@ sites/*/settings*.php
+ # Ignore paths that contain user-generated content.
+ sites/*/files
+ sites/*/private
++
++/vendor
++/.ddev
+diff --git a/.gitlab-ci.yml b/.gitlab-ci.yml
+index da509c4..ba6b090 100644
+--- a/.gitlab-ci.yml
++++ b/.gitlab-ci.yml
+@@ -9,6 +9,13 @@
+ # - DrupalSpoons
+ ################
+
++# Include packaging pipeline
++include:
++  - project: "tag1consulting/d7es-ci-packaging"
++    ref: main
++    file:
++      - "templates/package_release/package_release.yml"
++
+ ################
+ # Workflow
+ #
+@@ -39,6 +46,8 @@ workflow:
+     - if: $CI_PIPELINE_SOURCE == "web"
+      # Run if triggered from WebIDE
+     - if: $CI_PIPELINE_SOURCE == "webide"
++    # Run if tag pushed - required for packaging pipeline
++    - if: $CI_COMMIT_TAG
+
+ ################
+ # Variables
+@@ -55,10 +64,12 @@ workflow:
+
+ variables:
+   _CONFIG_DOCKERHUB_ROOT: "drupalci"
+-  _TARGET_PHP: "8.1"
++  _TARGET_PHP: "8.2"
+   CONCURRENCY: 15
+   GIT_DEPTH: "3"
+   COMPOSER_ALLOW_SUPERUSER: 1
++  SKIP_PHPSTAN: "1"
++  SKIP_PHPCS: "1"
+
+ ################
+ # Stages
+@@ -87,6 +98,11 @@ stages:
+   ################
+   - 🗜️ Test
+
++  # Used by packaging pipeline
++  - packaging
++  - upload
++  - release
++
+ #############
+ # Templates #
+ #############
+@@ -122,10 +138,10 @@ stages:
+ # Jobs define what scripts are actually executed in each stage.
+ ################
+
+-'🧹 PHP Compatibility checks (PHPCS)':
++'🧹 PHPCS':
+   stage: 🪄 Lint
+   variables:
+-    PHPCS_PHP_VERSION: "5.6"
++    PHPCS_PHP_VERSION: "8.2"
+     KUBERNETES_CPU_REQUEST: "16"
+   interruptible: true
+   allow_failure: true
+@@ -146,6 +162,8 @@ stages:
+     reports:
+       codequality: phpcs-quality-report.json
+   rules:
++    - if: $SKIP_PHPCS == "1"
++      when: never
+     - <<: *run-on-mr
+   before_script:
+     - echo "{}" > composer.json
+@@ -159,66 +177,136 @@ stages:
+     - echo "If this list contains more files than what you changed, then you need to rebase your branch."
+     - vendor/bin/phpcs --basepath=$CI_PROJECT_DIR --report-\\Micheh\\PhpCodeSniffer\\Report\\Gitlab=phpcs-quality-report.json --report-full --report-summary --standard=PHPCompatibility --runtime-set testVersion $PHPCS_PHP_VERSION --extensions=php,module,inc,install,test,profile,theme $MODIFIED
+
+-# Default job.
+-'PHP 8.1 MySQL 5.7':
+-  <<: *default-stage
++'🧹 PHPStan':
++  stage: 🪄 Lint
+   variables:
+-    _TARGET_PHP: "8.1"
+-    _TARGET_DB: "mysql-5.7"
++    KUBERNETES_CPU_REQUEST: "16"
++  interruptible: true
+   rules:
+-    - <<: *run-on-commit
+-    - <<: *run-on-mr
++    - if: $SKIP_PHPSTAN != "1"
++  retry:
++    max: 2
++    when:
++      - unknown_failure
++      - api_failure
++      - stuck_or_timeout_failure
++      - runner_system_failure
++      - scheduler_failure
++  image:
++    name: $_CONFIG_DOCKERHUB_ROOT/php-$_TARGET_PHP-apache:production
++  script:
++    - composer install --optimize-autoloader
++    - if [ -n "$COMPOSER_UPDATE" ]; then
++      composer update --optimize-autoloader;
++      composer outdated;
++      fi
++    - vendor/bin/phpstan --version
++    # Rely on PHPStan caching to execute analysis multiple times without performance drawback.
++    # Output a copy in junit.
++    - php vendor/bin/phpstan analyze --error-format=gitlab > phpstan-quality-report.json || EXIT_CODE=$?
++    - php vendor/bin/phpstan analyze --no-progress --error-format=junit > phpstan-junit.xml || true
++    - |
++      if [ -n "$EXIT_CODE" ]; then
++        # Output a copy in plain text for human logs.
++        php vendor/bin/phpstan analyze --no-progress || true
++        # Generate a new baseline.
++        echo "Generating an PHPStan baseline file (available as job artifact)."
++        php vendor/bin/phpstan analyze --no-progress --generate-baseline=phpstan-baseline.php || true
++        exit $EXIT_CODE
++      fi
+
++  artifacts:
++    reports:
++      codequality: phpstan-quality-report.json
++      junit: phpstan-junit.xml
++    # Only store the baseline if the job fails.
++    when: on_failure
++    paths:
++      - phpstan-baseline.php
++
++
++# Default job.
+ 'PHP 5.6 MySQL 5.5':
+   <<: *default-stage
+   variables:
+     _TARGET_PHP: "5.6"
+     _TARGET_DB: "mysql-5.5"
+-
+ 'PHP 7.2 MySQL 5.7':
+   <<: *default-stage
+   variables:
+     _TARGET_PHP: "7.2"
+     _TARGET_DB: "mysql-5.7"
+-
+ 'PHP 7.4 MySQL 5.7':
+   <<: *default-stage
+   variables:
+-    _TARGET_PHP: "7.4"
++    _TARGET_PHP: "7.4-ubuntu"
+     _TARGET_DB: "mysql-5.7"
+-
++'PHP 7.4 PostgreSQL 9.5':
++  <<: *default-stage
++  variables:
++    _TARGET_PHP: "7.4-ubuntu"
++    _TARGET_DB: "pgsql-9.5"
++'PHP 7.4 SQLite 3.27.0':
++  <<: *default-stage
++  variables:
++    _TARGET_PHP: "7.4-ubuntu"
++    _TARGET_DB: "sqlite-3"
+ 'PHP 8.0 MySQL 5.7':
+   <<: *default-stage
+   variables:
+-    _TARGET_PHP: "8.0"
++    _TARGET_PHP: "8.0-ubuntu"
+     _TARGET_DB: "mysql-5.7"
+-
+-'PHP 8.2 MySQL 8':
++'PHP 8.1 MariaDB 10.3.22':
++  <<: *default-stage
++  variables:
++   _TARGET_PHP: "8.1-ubuntu"
++   _TARGET_DB: "mariadb-10.3.22"
++'PHP 8.1 PostgreSQL 14.1':
++  <<: *default-stage
++  variables:
++    _TARGET_PHP: "8.1-ubuntu"
++    _TARGET_DB: "pgsql-14.1"
++'PHP 8.2 MySQL 5.7':
+   <<: *default-stage
+   variables:
+     _TARGET_PHP: "8.2"
++    _TARGET_DB: "mysql-5.7"
++'PHP 8.3 MySQL 8':
++  <<: *default-stage
++  variables:
++    _TARGET_PHP: "8.3-ubuntu"
+     _TARGET_DB: "mysql-8"
+-
+-'PHP 7.4 PostgreSQL 9.5':
++'PHP 8.3 MySQL 8.4':
+   <<: *default-stage
+   variables:
+-    _TARGET_PHP: "7.4"
+-    _TARGET_DB: "pgsql-9.5"
+-
+-'PHP 8.1 PostgreSQL 14.1':
++    _TARGET_PHP: "8.2-ubuntu"
++    _TARGET_DB: "mysql-8.4"
++'PHP 8.3 MySQL 9.4':
+   <<: *default-stage
+   variables:
+-    _TARGET_PHP: "8.1"
+-    _TARGET_DB: "pgsql-14.1"
+-
+-'PHP 7.4 SQLite 3.27.0':
++    _TARGET_PHP: "8.3-ubuntu"
++    _TARGET_DB: "mysql-9"
++'PHP 8.3 MySQL 5.7':
+   <<: *default-stage
+   variables:
+-    _TARGET_PHP: "7.4"
++    _TARGET_PHP: "8.3-ubuntu"
++    _TARGET_DB: "mysql-5.7"
++  rules:
++    - <<: *run-on-commit
++    - <<: *run-on-mr
++'PHP 8.3 SQLite 3.27.0':
++  <<: *default-stage
++  variables:
++    _TARGET_PHP: "8.3-ubuntu"
+     _TARGET_DB: "sqlite-3"
+-
+-'PHP 8.1 MariaDB 10.3.22':
++'PHP 8.3 PostgreSQL 14.1':
+   <<: *default-stage
+   variables:
+-   _TARGET_PHP: "8.1"
+-   _TARGET_DB: "mariadb-10.3.22"
++    _TARGET_PHP: "8.3-ubuntu"
++    _TARGET_DB: "pgsql-14.1"
++'PHP 8.4 MySQL 5.7':
++  <<: *default-stage
++  variables:
++    _TARGET_PHP: "8.4-ubuntu"
++    _TARGET_DB: "mysql-5.7"
++    PHP_INI_SCAN_DIR: "/var/www/html/subdirectory/.gitlab-ci"
+diff --git a/.gitlab-ci/error_reporting.ini b/.gitlab-ci/error_reporting.ini
+new file mode 100644
+index 0000000..e970858
+--- /dev/null
++++ b/.gitlab-ci/error_reporting.ini
+@@ -0,0 +1 @@
++error_reporting = E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED
+diff --git a/.gitlab-ci/pipeline.yml b/.gitlab-ci/pipeline.yml
+index 3272b26..43abe79 100644
+--- a/.gitlab-ci/pipeline.yml
++++ b/.gitlab-ci/pipeline.yml
+@@ -85,10 +85,12 @@ stages:
+   - sudo -u www-data git config --global --add safe.directory $CI_PROJECT_DIR
+
+ .install-drupal: &install-drupal
+-  - sudo -u www-data /usr/local/bin/drush si -y --db-url=$SIMPLETEST_DB --clean-url=0 --account-name=admin --account-pass=drupal --account-mail=admin@example.com
++  - export PHP_OPTIONS="-d error_reporting=0"
++  - sudo -u www-data /usr/local/bin/drush si -y standard install_configure_form.update_status_module='array(FALSE,FALSE)' --db-url=$SIMPLETEST_DB --clean-url=0 --account-name=admin --account-pass=drupal --account-mail=admin@example.com || true
+   - sudo -u www-data /usr/local/bin/drush vset simpletest_clear_results '0'
+   - sudo -u www-data /usr/local/bin/drush vset simpletest_verbose '1'
+   - sudo -u www-data /usr/local/bin/drush en -y simpletest
++  - unset PHP_OPTIONS
+
+ .run-tests: &run-tests
+   script:
+diff --git a/.gitlab/.gitkeep b/.gitlab/.gitkeep
+new file mode 100644
+index 0000000..e69de29
+diff --git a/.gitlab/merge_request_templates/Default.md b/.gitlab/merge_request_templates/Default.md
+new file mode 100644
+index 0000000..ac7e5ff
+--- /dev/null
++++ b/.gitlab/merge_request_templates/Default.md
+@@ -0,0 +1,17 @@
++## Issue link(s)
++<!-- #123 or tag1consulting/repo#123 -->
++
++## Description
++<!-- Briefly explain what the pull request is trying to achieve and any important technical context. -->
++
++## Test steps
++<!-- 1. When I do this...2. And that....3. Then I expect... -->
++
++## Manual Deploy Steps
++<!-- If this code requires any manual deploy steps, please describe below. -->
++
++## Followup Tasks
++<!-- If any followup tasks are needed, please describe below. -->
++
++## Other information
++<!-- Any other information that is important to this PR such as screenshots of how the component looks before and after the change. -->
+diff --git a/CHANGELOG.txt b/CHANGELOG.txt
+index 2cf701b..4803cf4 100644
+--- a/CHANGELOG.txt
++++ b/CHANGELOG.txt
+@@ -1,3 +1,6 @@
++Drupal 7.xxx, xxxx-xx-xx (development version)
++------------------------
++
+ Drupal 7.103, 2024-12-04
+ ------------------------
+ - So Long, and Thanks for All the Fish
+diff --git a/D7ES_CHANGELOG.txt b/D7ES_CHANGELOG.txt
+new file mode 100644
+index 0000000..4995e9e
+--- /dev/null
++++ b/D7ES_CHANGELOG.txt
+@@ -0,0 +1,14 @@
++Drupal 7.106, 2026-08-19
++------------------------
++- Security: Addresses information disclosure of image style derivatives stored on file schemes other than the core private scheme.
++
++Drupal 7.105, 2025-10-01
++------------------------
++- PHP 8.4 support
++  - To reduce noise in logs, consider adding
++    ini_set('error_reporting', E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
++    to settings.php or otherwise disable deprecation error reporting.
++
++Drupal 7.104, 2025-10-01
++------------------------
++- Backport Backdrop SA-Contrib 2025-015 for BBQ JavaScript.
+diff --git a/LICENSE.txt b/LICENSE.txt
+index d159169..94fb846 100644
+--- a/LICENSE.txt
++++ b/LICENSE.txt
+@@ -1,12 +1,12 @@
+-                    GNU GENERAL PUBLIC LICENSE
+-                       Version 2, June 1991
++        GNU GENERAL PUBLIC LICENSE
++           Version 2, June 1991
+
+  Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+  Everyone is permitted to copy and distribute verbatim copies
+  of this license document, but changing it is not allowed.
+
+-                            Preamble
++          Preamble
+
+   The licenses for most software are designed to take away your
+ freedom to share and change it.  By contrast, the GNU General Public
+@@ -56,7 +56,7 @@ patent must be licensed for everyone's free use or not licensed at all.
+   The precise terms and conditions for copying, distribution and
+ modification follow.
+
+-                    GNU GENERAL PUBLIC LICENSE
++        GNU GENERAL PUBLIC LICENSE
+    TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+
+   0. This License applies to any program or other work which contains
+@@ -255,7 +255,7 @@ make exceptions for this.  Our decision will be guided by the two goals
+ of preserving the free status of all derivatives of our free software and
+ of promoting the sharing and reuse of software generally.
+
+-                            NO WARRANTY
++          NO WARRANTY
+
+   11. BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
+ FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN
+@@ -277,9 +277,9 @@ YOU OR THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER
+ PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE
+ POSSIBILITY OF SUCH DAMAGES.
+
+-                     END OF TERMS AND CONDITIONS
++         END OF TERMS AND CONDITIONS
+
+-            How to Apply These Terms to Your New Programs
++      How to Apply These Terms to Your New Programs
+
+   If you develop a new program, and you want it to be of the greatest
+ possible use to the public, the best way to achieve this is to make it
+diff --git a/includes/bootstrap.inc b/includes/bootstrap.inc
+index 5d9a59a..be87efe 100644
+--- a/includes/bootstrap.inc
++++ b/includes/bootstrap.inc
+@@ -8,7 +8,7 @@
+ /**
+  * The current system version.
+  */
+-define('VERSION', '7.103');
++define('VERSION', '7.106');
+
+ /**
+  * Core API compatibility.
+diff --git a/includes/errors.inc b/includes/errors.inc
+index ececd89..e57e872 100644
+--- a/includes/errors.inc
++++ b/includes/errors.inc
+@@ -26,7 +26,6 @@ function drupal_error_levels() {
+     E_USER_ERROR => array('User error', WATCHDOG_ERROR),
+     E_USER_WARNING => array('User warning', WATCHDOG_WARNING),
+     E_USER_NOTICE => array('User notice', WATCHDOG_NOTICE),
+-    E_STRICT => array('Strict warning', WATCHDOG_DEBUG),
+     E_RECOVERABLE_ERROR => array('Recoverable fatal error', WATCHDOG_ERROR),
+   );
+   // E_DEPRECATED and E_USER_DEPRECATED were added in PHP 5.3.0.
+@@ -34,6 +33,10 @@ function drupal_error_levels() {
+     $types[E_DEPRECATED] = array('Deprecated function', WATCHDOG_DEBUG);
+     $types[E_USER_DEPRECATED] = array('User deprecated function', WATCHDOG_DEBUG);
+   }
++  // E_STRICT is deprecated in PHP 8.4.
++  if (PHP_VERSION_ID < 80400) {
++    $types[E_STRICT] = array('Strict warning', WATCHDOG_DEBUG);
++  }
+   return $types;
+ }
+
+diff --git a/includes/session.inc b/includes/session.inc
+index a174290..849599b 100644
+--- a/includes/session.inc
++++ b/includes/session.inc
+@@ -242,7 +242,7 @@ function _drupal_session_write($sid, $value) {
+ function drupal_session_initialize() {
+   global $user, $is_https;
+
+-  session_set_save_handler('_drupal_session_open', '_drupal_session_close', '_drupal_session_read', '_drupal_session_write', '_drupal_session_destroy', '_drupal_session_garbage_collection');
++  session_set_save_handler(new DrupalSessionHandler());
+
+   // We use !empty() in the following check to ensure that blank session IDs
+   // are not valid.
+@@ -620,3 +620,40 @@ function drupal_session_id($id) {
+   }
+   return $id;
+ }
++
++/**
++ * Session handler implementation.
++ */
++class DrupalSessionHandler implements SessionHandlerInterface {
++
++  #[ReturnTypeWillChange]
++  public function open($path, $name) {
++    return _drupal_session_open($path, $name);
++  }
++
++  #[ReturnTypeWillChange]
++  public function close() {
++    return _drupal_session_close();
++  }
++
++  #[\ReturnTypeWillChange]
++  public function read($id) {
++    return _drupal_session_read($id);
++  }
++
++  #[\ReturnTypeWillChange]
++  public function write($id, $data) {
++    return _drupal_session_write($id, $data);
++  }
++
++  #[\ReturnTypeWillChange]
++  public function destroy($id) {
++    return _drupal_session_destroy($id);
++  }
++
++  #[\ReturnTypeWillChange]
++  public function gc($max_lifetime) {
++    return _drupal_session_garbage_collection($max_lifetime);
++  }
++
++}
+diff --git a/misc/jquery.ba-bbq.js b/misc/jquery.ba-bbq.js
+index deb9a2f..2f9ab6f 100644
+--- a/misc/jquery.ba-bbq.js
++++ b/misc/jquery.ba-bbq.js
+@@ -1,19 +1,18 @@
+-
+-/*
+- * jQuery BBQ: Back Button & Query Library - v1.2.1 - 2/17/2010
+- * http://benalman.com/projects/jquery-bbq-plugin/
++/*!
++ * jQuery BBQ: Back Button & Query Library - v1.4pre - 1/15/2013
++ * https://benalman.com/projects/jquery-bbq-plugin/
+  *
+- * Copyright (c) 2010 "Cowboy" Ben Alman
++ * Copyright (c) 2010-2013 "Cowboy" Ben Alman
+  * Dual licensed under the MIT and GPL licenses.
+- * http://benalman.com/about/license/
++ * https://benalman.com/about/license/
+  */
+-(function($,p){var i,m=Array.prototype.slice,r=decodeURIComponent,a=$.param,c,l,v,b=$.bbq=$.bbq||{},q,u,j,e=$.event.special,d="hashchange",A="querystring",D="fragment",y="elemUrlAttr",g="location",k="href",t="src",x=/^.*\?|#.*$/g,w=/^.*\#/,h,C={};function E(F){return typeof F==="string"}function B(G){var F=m.call(arguments,1);return function(){return G.apply(this,F.concat(m.call(arguments)))}}function n(F){return F.replace(/^[^#]*#?(.*)$/,"$1")}function o(F){return F.replace(/(?:^[^?#]*\?([^#]*).*$)?.*/,"$1")}function f(H,M,F,I,G){var O,L,K,N,J;if(I!==i){K=F.match(H?/^([^#]*)\#?(.*)$/:/^([^#?]*)\??([^#]*)(#?.*)/);J=K[3]||"";if(G===2&&E(I)){L=I.replace(H?w:x,"")}else{N=l(K[2]);I=E(I)?l[H?D:A](I):I;L=G===2?I:G===1?$.extend({},I,N):$.extend({},N,I);L=a(L);if(H){L=L.replace(h,r)}}O=K[1]+(H?"#":L||!K[1]?"?":"")+L+J}else{O=M(F!==i?F:p[g][k])}return O}a[A]=B(f,0,o);a[D]=c=B(f,1,n);c.noEscape=function(G){G=G||"";var F=$.map(G.split(""),encodeURIComponent);h=new RegExp(F.join("|"),"g")};c.noEscape(",/");$.deparam=l=function(I,F){var H={},G={"true":!0,"false":!1,"null":null};$.each(I.replace(/\+/g," ").split("&"),function(L,Q){var K=Q.split("="),P=r(K[0]),J,O=H,M=0,R=P.split("]["),N=R.length-1;if(/\[/.test(R[0])&&/\]$/.test(R[N])){R[N]=R[N].replace(/\]$/,"");R=R.shift().split("[").concat(R);N=R.length-1}else{N=0}if(K.length===2){J=r(K[1]);if(F){J=J&&!isNaN(J)?+J:J==="undefined"?i:G[J]!==i?G[J]:J}if(N){for(;M<=N;M++){P=R[M]===""?O.length:R[M];O=O[P]=M<N?O[P]||(R[M+1]&&isNaN(R[M+1])?{}:[]):J}}else{if($.isArray(H[P])){H[P].push(J)}else{if(H[P]!==i){H[P]=[H[P],J]}else{H[P]=J}}}}else{if(P){H[P]=F?i:""}}});return H};function z(H,F,G){if(F===i||typeof F==="boolean"){G=F;F=a[H?D:A]()}else{F=E(F)?F.replace(H?w:x,""):F}return l(F,G)}l[A]=B(z,0);l[D]=v=B(z,1);$[y]||($[y]=function(F){return $.extend(C,F)})({a:k,base:k,iframe:t,img:t,input:t,form:"action",link:k,script:t});j=$[y];function s(I,G,H,F){if(!E(H)&&typeof H!=="object"){F=H;H=G;G=i}return this.each(function(){var L=$(this),J=G||j()[(this.nodeName||"").toLowerCase()]||"",K=J&&L.attr(J)||"";L.attr(J,a[I](K,H,F))})}$.fn[A]=B(s,A);$.fn[D]=B(s,D);b.pushState=q=function(I,F){if(E(I)&&/^#/.test(I)&&F===i){F=2}var H=I!==i,G=c(p[g][k],H?I:{},H?F:2);p[g][k]=G+(/#/.test(G)?"":"#")};b.getState=u=function(F,G){return F===i||typeof F==="boolean"?v(F):v(G)[F]};b.removeState=function(F){var G={};if(F!==i){G=u();$.each($.isArray(F)?F:arguments,function(I,H){delete G[H]})}q(G,2)};e[d]=$.extend(e[d],{add:function(F){var H;function G(J){var I=J[D]=c();J.getState=function(K,L){return K===i||typeof K==="boolean"?l(I,K):l(I,L)[K]};H.apply(this,arguments)}if($.isFunction(F)){H=F;return G}else{H=F.handler;F.handler=G}}})})(jQuery,this);
+-/*
+- * jQuery hashchange event - v1.2 - 2/11/2010
+- * http://benalman.com/projects/jquery-hashchange-plugin/
++(function($,r){var h,n=Array.prototype.slice,t=decodeURIComponent,a=$.param,j,c,m,y,b=$.bbq=$.bbq||{},s,x,k,e=$.event.special,d="hashchange",B="querystring",F="fragment",z="elemUrlAttr",l="href",w="src",p=/^.*\?|#.*$/g,u,H,g,i,C,E={};function G(I){return typeof I==="string"}function D(J){var I=n.call(arguments,1);return function(){return J.apply(this,I.concat(n.call(arguments)))}}function o(I){return I.replace(H,"$2")}function q(I){return I.replace(/(?:^[^?#]*\?([^#]*).*$)?.*/,"$1")}function f(K,P,I,L,J){var R,O,N,Q,M;if(L!==h){N=I.match(K?H:/^([^#?]*)\??([^#]*)(#?.*)/);M=N[3]||"";if(J===2&&G(L)){O=L.replace(K?u:p,"")}else{Q=m(N[2]);L=G(L)?m[K?F:B](L):L;O=J===2?L:J===1?$.extend({},L,Q):$.extend({},Q,L);O=j(O);if(K){O=O.replace(g,t)}}R=N[1]+(K?C:O||!N[1]?"?":"")+O+M}else{R=P(I!==h?I:location.href)}return R}a[B]=D(f,0,q);a[F]=c=D(f,1,o);a.sorted=j=function(J,K){var I=[],L={};$.each(a(J,K).split("&"),function(P,M){var O=M.replace(/(?:%5B|=).*$/,""),N=L[O];if(!N){N=L[O]=[];I.push(O)}N.push(M)});return $.map(I.sort(),function(M){return L[M]}).join("&")};c.noEscape=function(J){J=J||"";var I=$.map(J.split(""),encodeURIComponent);g=new RegExp(I.join("|"),"g")};c.noEscape(",/");c.ajaxCrawlable=function(I){if(I!==h){if(I){u=/^.*(?:#!|#)/;H=/^([^#]*)(?:#!|#)?(.*)$/;C="#!"}else{u=/^.*#/;H=/^([^#]*)#?(.*)$/;C="#"}i=!!I}return i};c.ajaxCrawlable(0);$.deparam=m=function(M,J){var I=["__proto__","constructor"];var L={},K={"true":!0,"false":!1,"null":null};$.each(M.replace(/\+/g," ").split("&"),function(P,U){var O=U.split("="),T=t(O[0]),N,S=L,Q=0,V=T.split("]["),R=V.length-1;if(I.includes(T)){return}if(/\[/.test(V[0])&&/\]$/.test(V[R])){V[R]=V[R].replace(/\]$/,"");V=V.shift().split("[").concat(V);R=V.length-1}else{R=0}if(O.length===2){N=t(O[1]);if(J){N=N&&!isNaN(N)?+N:N==="undefined"?h:K[N]!==h?K[N]:N}if(R){for(;Q<=R;Q++){T=V[Q]===""?S.length:V[Q];if(I.includes(T)){return}S=S[T]=Q<R?S[T]||(V[Q+1]&&isNaN(V[Q+1])?{}:[]):N}}else{if($.isArray(L[T])){L[T].push(N)}else{if(L[T]!==h){L[T]=[L[T],N]}else{L[T]=N}}}}else{if(T){L[T]=J?h:""}}});return L};function A(K,I,J){if(I===h||typeof I==="boolean"){J=I;I=a[K?F:B]()}else{I=G(I)?I.replace(K?u:p,""):I}return m(I,J)}m[B]=D(A,0);m[F]=y=D(A,1);$[z]||($[z]=function(I){return $.extend(E,I)})({a:l,base:l,iframe:w,img:w,input:w,form:"action",link:l,script:w});k=$[z];function v(L,J,K,I){if(!G(K)&&typeof K!=="object"){I=K;K=J;J=h}return this.each(function(){var O=$(this),M=J||k()[(this.nodeName||"").toLowerCase()]||"",N=M&&O.attr(M)||"";O.attr(M,a[L](N,K,I))})}$.fn[B]=D(v,B);$.fn[F]=D(v,F);b.pushState=s=function(L,I){if(G(L)&&/^#/.test(L)&&I===h){I=2}var K=L!==h,J=c(location.href,K?L:{},K?I:2);location.href=J};b.getState=x=function(I,J){return I===h||typeof I==="boolean"?y(I):y(J)[I]};b.removeState=function(I){var J={};if(I!==h){J=x();$.each($.isArray(I)?I:arguments,function(L,K){delete J[K]})}s(J,2)};e[d]=$.extend(e[d],{add:function(I){var K;function J(M){var L=M[F]=c();M.getState=function(N,O){return N===h||typeof N==="boolean"?m(L,N):m(L,O)[N]};K.apply(this,arguments)}if($.isFunction(I)){K=I;return J}else{K=I.handler;I.handler=J}}})})(jQuery,this);
++/*!
++ * jQuery hashchange event - v1.3 - 7/21/2010
++ * https://benalman.com/projects/jquery-hashchange-plugin/
+  *
+  * Copyright (c) 2010 "Cowboy" Ben Alman
+  * Dual licensed under the MIT and GPL licenses.
+- * http://benalman.com/about/license/
++ * https://benalman.com/about/license/
+  */
+-(function($,i,b){var j,k=$.event.special,c="location",d="hashchange",l="href",f=$.browser,g=document.documentMode,h=f.msie&&(g===b||g<8),e="on"+d in i&&!h;function a(m){m=m||i[c][l];return m.replace(/^[^#]*#?(.*)$/,"$1")}$[d+"Delay"]=100;k[d]=$.extend(k[d],{setup:function(){if(e){return false}$(j.start)},teardown:function(){if(e){return false}$(j.stop)}});j=(function(){var m={},r,n,o,q;function p(){o=q=function(s){return s};if(h){n=$('<iframe src="javascript:0"/>').hide().insertAfter("body")[0].contentWindow;q=function(){return a(n.document[c][l])};o=function(u,s){if(u!==s){var t=n.document;t.open().close();t[c].hash="#"+u}};o(a())}}m.start=function(){if(r){return}var t=a();o||p();(function s(){var v=a(),u=q(t);if(v!==t){o(t=v,u);$(i).trigger(d)}else{if(u!==t){i[c][l]=i[c][l].replace(/#.*/,"")+"#"+u}}r=setTimeout(s,$[d+"Delay"])})()};m.stop=function(){if(!n){r&&clearTimeout(r);r=0}};return m})()})(jQuery,this);
++(function($,e,b){var c="hashchange",h=document,f,g=$.event.special,i=h.documentMode,d="on"+c in e&&(i===b||i>7);function a(j){j=j||location.href;return"#"+j.replace(/^[^#]*#?(.*)$/,"$1")}$.fn[c]=function(j){return j?this.bind(c,j):this.trigger(c)};$.fn[c].delay=50;g[c]=$.extend(g[c],{setup:function(){if(d){return false}$(f.start)},teardown:function(){if(d){return false}$(f.stop)}});f=(function(){var j={},p,m=a(),k=function(q){return q},l=k,o=k;j.start=function(){p||n()};j.stop=function(){p&&clearTimeout(p);p=b};function n(){var r=a(),q=o(m);if(r!==m){l(m=r,q);$(e).trigger(c)}else{if(q!==m){location.href=location.href.replace(/#.*/,"")+q}}p=setTimeout(n,$.fn[c].delay)}return j})()})(jQuery,this);
+diff --git a/modules/aggregator/aggregator.info b/modules/aggregator/aggregator.info
+index 16b456d..2fd7444 100644
+--- a/modules/aggregator/aggregator.info
++++ b/modules/aggregator/aggregator.info
+@@ -1,13 +1,12 @@
+ name = Aggregator
+ description = "Aggregates syndicated content (RSS, RDF, and Atom feeds)."
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = aggregator.test
+ configure = admin/config/services/aggregator/settings
+ stylesheets[all][] = aggregator.css
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/aggregator/tests/aggregator_test.info b/modules/aggregator/tests/aggregator_test.info
+index bbe31ae..5ca6b7b 100644
+--- a/modules/aggregator/tests/aggregator_test.info
++++ b/modules/aggregator/tests/aggregator_test.info
+@@ -1,11 +1,10 @@
+ name = "Aggregator module tests"
+ description = "Support module for aggregator related testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/announcements_feed/announcements_feed.info b/modules/announcements_feed/announcements_feed.info
+index daed719..8852e18 100644
+--- a/modules/announcements_feed/announcements_feed.info
++++ b/modules/announcements_feed/announcements_feed.info
+@@ -1,11 +1,10 @@
+ name = Announcements
+ description =  Displays announcements from the Drupal community.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = tests/announce_feed_test.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/announcements_feed/tests/announce_feed_test.info b/modules/announcements_feed/tests/announce_feed_test.info
+index 252ba32..ba6bc1a 100644
+--- a/modules/announcements_feed/tests/announce_feed_test.info
++++ b/modules/announcements_feed/tests/announce_feed_test.info
+@@ -4,7 +4,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/block/block.info b/modules/block/block.info
+index 53b03cb..338f407 100644
+--- a/modules/block/block.info
++++ b/modules/block/block.info
+@@ -1,12 +1,11 @@
+ name = Block
+ description = Controls the visual building blocks a page is constructed with. Blocks are boxes of content rendered into an area, or region, of a web page.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = block.test
+ configure = admin/structure/block
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/block/tests/block_test.info b/modules/block/tests/block_test.info
+index b4f6f94..2820b54 100644
+--- a/modules/block/tests/block_test.info
++++ b/modules/block/tests/block_test.info
+@@ -1,11 +1,10 @@
+ name = Block test
+ description = Provides test blocks.
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/block/tests/themes/block_test_theme/block_test_theme.info b/modules/block/tests/themes/block_test_theme/block_test_theme.info
+index 0dad7bd..2f0af37 100644
+--- a/modules/block/tests/themes/block_test_theme/block_test_theme.info
++++ b/modules/block/tests/themes/block_test_theme/block_test_theme.info
+@@ -13,7 +13,6 @@ regions[footer] = Footer
+ regions[highlighted] = Highlighted
+ regions[help] = Help
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/blog/blog.info b/modules/blog/blog.info
+index 1aacd1a..c6fb4fd 100644
+--- a/modules/blog/blog.info
++++ b/modules/blog/blog.info
+@@ -1,11 +1,10 @@
+ name = Blog
+ description = Enables multi-user blogs.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = blog.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/book/book.info b/modules/book/book.info
+index e88763e..5c83a97 100644
+--- a/modules/book/book.info
++++ b/modules/book/book.info
+@@ -1,13 +1,12 @@
+ name = Book
+ description = Allows users to create and organize related content in an outline.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = book.test
+ configure = admin/content/book/settings
+ stylesheets[all][] = book.css
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/color/color.info b/modules/color/color.info
+index ff5fbb1..46fb552 100644
+--- a/modules/color/color.info
++++ b/modules/color/color.info
+@@ -1,11 +1,10 @@
+ name = Color
+ description = Allows administrators to change the color scheme of compatible themes.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = color.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/comment/comment.info b/modules/comment/comment.info
+index 5ee4c47..653ff74 100644
+--- a/modules/comment/comment.info
++++ b/modules/comment/comment.info
+@@ -1,7 +1,7 @@
+ name = Comment
+ description = Allows users to comment on and discuss published content.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = text
+ files[] = comment.module
+@@ -9,7 +9,6 @@ files[] = comment.test
+ configure = admin/content/comment
+ stylesheets[all][] = comment.css
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/comment/tests/comment_hook_test.info b/modules/comment/tests/comment_hook_test.info
+index 983d274..121161c 100644
+--- a/modules/comment/tests/comment_hook_test.info
++++ b/modules/comment/tests/comment_hook_test.info
+@@ -2,10 +2,9 @@ name = "Comment Hooks Test"
+ description = "Support module for comment hook tests."
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/contact/contact.info b/modules/contact/contact.info
+index 9484ea1..ff16360 100644
+--- a/modules/contact/contact.info
++++ b/modules/contact/contact.info
+@@ -1,12 +1,11 @@
+ name = Contact
+ description = Enables the use of both personal and site-wide contact forms.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = contact.test
+ configure = admin/structure/contact
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/contextual/contextual.info b/modules/contextual/contextual.info
+index 737d404..4534190 100644
+--- a/modules/contextual/contextual.info
++++ b/modules/contextual/contextual.info
+@@ -1,11 +1,10 @@
+ name = Contextual links
+ description = Provides contextual links to perform actions related to elements on a page.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = contextual.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/dashboard/dashboard.info b/modules/dashboard/dashboard.info
+index 82b3f96..eab8277 100644
+--- a/modules/dashboard/dashboard.info
++++ b/modules/dashboard/dashboard.info
+@@ -2,12 +2,11 @@ name = Dashboard
+ description = Provides a dashboard page in the administrative interface for organizing administrative tasks and tracking information within your site.
+ core = 7.x
+ package = Core
+-version = VERSION
++# version = VERSION
+ files[] = dashboard.test
+ dependencies[] = block
+ configure = admin/dashboard/customize
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/dblog/dblog.info b/modules/dblog/dblog.info
+index 748c3b9..cfe71c9 100644
+--- a/modules/dblog/dblog.info
++++ b/modules/dblog/dblog.info
+@@ -1,11 +1,10 @@
+ name = Database logging
+ description = Logs and records system events to the database.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = dblog.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/field/field.info b/modules/field/field.info
+index cb66da7..5908da1 100644
+--- a/modules/field/field.info
++++ b/modules/field/field.info
+@@ -1,7 +1,7 @@
+ name = Field
+ description = Field API to add fields to entities like nodes and users.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = field.module
+ files[] = field.attach.inc
+@@ -11,7 +11,6 @@ dependencies[] = field_sql_storage
+ required = TRUE
+ stylesheets[all][] = theme/field.css
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/field/modules/field_sql_storage/field_sql_storage.info b/modules/field/modules/field_sql_storage/field_sql_storage.info
+index 6662d1c..bc5c447 100644
+--- a/modules/field/modules/field_sql_storage/field_sql_storage.info
++++ b/modules/field/modules/field_sql_storage/field_sql_storage.info
+@@ -1,13 +1,12 @@
+ name = Field SQL storage
+ description = Stores field data in an SQL database.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = field
+ files[] = field_sql_storage.test
+ required = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/field/modules/list/list.info b/modules/field/modules/list/list.info
+index e884236..8856706 100644
+--- a/modules/field/modules/list/list.info
++++ b/modules/field/modules/list/list.info
+@@ -1,13 +1,12 @@
+ name = List
+ description = Defines list field types. Use with Options to create selection lists.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = field
+ dependencies[] = options
+ files[] = tests/list.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/field/modules/list/tests/list_test.info b/modules/field/modules/list/tests/list_test.info
+index c08d4a2..18db402 100644
+--- a/modules/field/modules/list/tests/list_test.info
++++ b/modules/field/modules/list/tests/list_test.info
+@@ -2,10 +2,9 @@ name = "List test"
+ description = "Support module for the List module tests."
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/field/modules/number/number.info b/modules/field/modules/number/number.info
+index 955adac..70b4b74 100644
+--- a/modules/field/modules/number/number.info
++++ b/modules/field/modules/number/number.info
+@@ -1,12 +1,11 @@
+ name = Number
+ description = Defines numeric field types.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = field
+ files[] = number.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/field/modules/options/options.info b/modules/field/modules/options/options.info
+index 8ca0256..c70a4cf 100644
+--- a/modules/field/modules/options/options.info
++++ b/modules/field/modules/options/options.info
+@@ -1,12 +1,11 @@
+ name = Options
+ description = Defines selection, check box and radio button widgets for text and numeric fields.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = field
+ files[] = options.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/field/modules/text/text.info b/modules/field/modules/text/text.info
+index 80e793c..1d043c3 100644
+--- a/modules/field/modules/text/text.info
++++ b/modules/field/modules/text/text.info
+@@ -1,13 +1,12 @@
+ name = Text
+ description = Defines simple text field types.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = field
+ files[] = text.test
+ required = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/field/tests/field_test.info b/modules/field/tests/field_test.info
+index 2430d7d..28d7ed8 100644
+--- a/modules/field/tests/field_test.info
++++ b/modules/field/tests/field_test.info
+@@ -3,10 +3,9 @@ description = "Support module for the Field API tests."
+ core = 7.x
+ package = Testing
+ files[] = field_test.entity.inc
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/field/tests/field_test_schema_alter.info b/modules/field/tests/field_test_schema_alter.info
+index 7fae99c..271efe8 100644
+--- a/modules/field/tests/field_test_schema_alter.info
++++ b/modules/field/tests/field_test_schema_alter.info
+@@ -2,10 +2,9 @@ name = "Field API Schema Alter Test"
+ description = "Support module for the Field API schema alter tests."
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/field_ui/field_ui.info b/modules/field_ui/field_ui.info
+index 4b284ee..d99f165 100644
+--- a/modules/field_ui/field_ui.info
++++ b/modules/field_ui/field_ui.info
+@@ -1,12 +1,11 @@
+ name = Field UI
+ description = User interface for the Field API.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = field
+ files[] = field_ui.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/file/file.info b/modules/file/file.info
+index 4777dc9..a430f87 100644
+--- a/modules/file/file.info
++++ b/modules/file/file.info
+@@ -1,12 +1,11 @@
+ name = File
+ description = Defines a file field type.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = field
+ files[] = tests/file.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/file/tests/file_module_test.info b/modules/file/tests/file_module_test.info
+index cfc5250..bec9053 100644
+--- a/modules/file/tests/file_module_test.info
++++ b/modules/file/tests/file_module_test.info
+@@ -1,11 +1,10 @@
+ name = File test
+ description = Provides hooks for testing File module functionality.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/filter/filter.info b/modules/filter/filter.info
+index 7325980..34a3a25 100644
+--- a/modules/filter/filter.info
++++ b/modules/filter/filter.info
+@@ -1,13 +1,12 @@
+ name = Filter
+ description = Filters content in preparation for display.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = filter.test
+ required = TRUE
+ configure = admin/config/content/formats
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/forum/forum.info b/modules/forum/forum.info
+index 83e4ecf..04511f4 100644
+--- a/modules/forum/forum.info
++++ b/modules/forum/forum.info
+@@ -3,13 +3,12 @@ description = Provides discussion forums.
+ dependencies[] = taxonomy
+ dependencies[] = comment
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = forum.test
+ configure = admin/structure/forum
+ stylesheets[all][] = forum.css
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/help/help.info b/modules/help/help.info
+index 0ec2798..b57f5cb 100644
+--- a/modules/help/help.info
++++ b/modules/help/help.info
+@@ -1,11 +1,10 @@
+ name = Help
+ description = Manages the display of online help.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = help.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/image/image.info b/modules/image/image.info
+index dfefe02..258a30c 100644
+--- a/modules/image/image.info
++++ b/modules/image/image.info
+@@ -1,13 +1,12 @@
+ name = Image
+ description = Provides image manipulation tools.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = file
+ files[] = image.test
+ configure = admin/config/media/image-styles
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/image/image.module b/modules/image/image.module
+index f18e005..ee03eeb 100644
+--- a/modules/image/image.module
++++ b/modules/image/image.module
+@@ -857,17 +857,12 @@ function image_style_deliver($style, $scheme = NULL) {
+   $derivative_uri = image_style_path($style['name'], $image_uri);
+   $derivative_scheme = file_uri_scheme($derivative_uri);
+
+-  if ($token_is_valid) {
+-    $is_public = ($scheme !== 'private');
+-  }
+-  else {
+-    $core_schemes = array('public', 'private', 'temporary');
+-    $additional_public_schemes = array_diff(variable_get('file_additional_public_schemes', array()), $core_schemes);
+-    $public_schemes = array_merge(array('public'), $additional_public_schemes);
+-    $is_public = in_array($derivative_scheme, $public_schemes, TRUE);
+-  }
++  $core_schemes = array('public', 'private', 'temporary');
++  $additional_public_schemes = array_diff(variable_get('file_additional_public_schemes', array()), $core_schemes);
++  $public_schemes = array_merge(array('public'), $additional_public_schemes);
++  $is_public = in_array($derivative_scheme, $public_schemes, TRUE);
+
+-  if ($scheme == 'private' && file_exists($derivative_uri)) {
++  if (!$is_public && file_exists($derivative_uri)) {
+     file_download($scheme, file_uri_target($derivative_uri));
+   }
+
+diff --git a/modules/image/tests/image_module_styles_test.info b/modules/image/tests/image_module_styles_test.info
+index ef88779..98a175e 100644
+--- a/modules/image/tests/image_module_styles_test.info
++++ b/modules/image/tests/image_module_styles_test.info
+@@ -1,13 +1,12 @@
+ name = Image Styles test
+ description = Provides additional hook implementations for testing Image Styles functionality.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = image_module_styles_test.module
+ dependencies[] = image_module_test
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/image/tests/image_module_test.info b/modules/image/tests/image_module_test.info
+index c1e6ce8..0636d84 100644
+--- a/modules/image/tests/image_module_test.info
++++ b/modules/image/tests/image_module_test.info
+@@ -1,12 +1,11 @@
+ name = Image test
+ description = Provides hook implementations for testing Image module functionality.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = image_module_test.module
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/locale/locale.info b/modules/locale/locale.info
+index 7603837..1ba6121 100644
+--- a/modules/locale/locale.info
++++ b/modules/locale/locale.info
+@@ -1,12 +1,11 @@
+ name = Locale
+ description = Adds language handling functionality and enables the translation of the user interface to languages other than English.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = locale.test
+ configure = admin/config/regional/language
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/locale/tests/locale_test.info b/modules/locale/tests/locale_test.info
+index 809486b..3701d8c 100644
+--- a/modules/locale/tests/locale_test.info
++++ b/modules/locale/tests/locale_test.info
+@@ -2,10 +2,9 @@ name = "Locale Test"
+ description = "Support module for the locale layer tests."
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/menu/menu.info b/modules/menu/menu.info
+index 4319881..1f5127d 100644
+--- a/modules/menu/menu.info
++++ b/modules/menu/menu.info
+@@ -1,12 +1,11 @@
+ name = Menu
+ description = Allows administrators to customize the site navigation menu.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = menu.test
+ configure = admin/structure/menu
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/node/node.info b/modules/node/node.info
+index 32eab4c..80ac9bc 100644
+--- a/modules/node/node.info
++++ b/modules/node/node.info
+@@ -1,7 +1,7 @@
+ name = Node
+ description = Allows content to be submitted to the site and displayed on pages.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = node.module
+ files[] = node.test
+@@ -9,7 +9,6 @@ required = TRUE
+ configure = admin/structure/types
+ stylesheets[all][] = node.css
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/node/tests/node_access_test.info b/modules/node/tests/node_access_test.info
+index 018caad..a77ba34 100644
+--- a/modules/node/tests/node_access_test.info
++++ b/modules/node/tests/node_access_test.info
+@@ -1,11 +1,10 @@
+ name = "Node module access tests"
+ description = "Support module for node permission testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/node/tests/node_test.info b/modules/node/tests/node_test.info
+index bbccaa8..0bec9c4 100644
+--- a/modules/node/tests/node_test.info
++++ b/modules/node/tests/node_test.info
+@@ -1,11 +1,10 @@
+ name = "Node module tests"
+ description = "Support module for node related testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/node/tests/node_test_exception.info b/modules/node/tests/node_test_exception.info
+index 9953ec6..f460e55 100644
+--- a/modules/node/tests/node_test_exception.info
++++ b/modules/node/tests/node_test_exception.info
+@@ -1,11 +1,10 @@
+ name = "Node module exception tests"
+ description = "Support module for node related exception testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/openid/openid.info b/modules/openid/openid.info
+index d22acfb..fb1c23a 100644
+--- a/modules/openid/openid.info
++++ b/modules/openid/openid.info
+@@ -1,11 +1,10 @@
+ name = OpenID
+ description = "Allows users to log into your site using OpenID."
+-version = VERSION
++# version = VERSION
+ package = Core
+ core = 7.x
+ files[] = openid.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/openid/tests/openid_test.info b/modules/openid/tests/openid_test.info
+index 479948b..30345de 100644
+--- a/modules/openid/tests/openid_test.info
++++ b/modules/openid/tests/openid_test.info
+@@ -1,12 +1,11 @@
+ name = OpenID dummy provider
+ description = "OpenID provider used for testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = openid
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/overlay/overlay.info b/modules/overlay/overlay.info
+index e42bdc0..1817674 100644
+--- a/modules/overlay/overlay.info
++++ b/modules/overlay/overlay.info
+@@ -1,10 +1,9 @@
+ name = Overlay
+ description = Displays the Drupal administration interface in an overlay.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/path/path.info b/modules/path/path.info
+index ca94aad..39d4d11 100644
+--- a/modules/path/path.info
++++ b/modules/path/path.info
+@@ -1,12 +1,11 @@
+ name = Path
+ description = Allows users to rename URLs.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = path.test
+ configure = admin/config/search/path
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/php/php.info b/modules/php/php.info
+index 079f26b..f6a7aad 100644
+--- a/modules/php/php.info
++++ b/modules/php/php.info
+@@ -1,11 +1,10 @@
+ name = PHP filter
+ description = Allows embedded PHP code/snippets to be evaluated.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = php.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/poll/poll.info b/modules/poll/poll.info
+index a97a116..e595769 100644
+--- a/modules/poll/poll.info
++++ b/modules/poll/poll.info
+@@ -1,12 +1,11 @@
+ name = Poll
+ description = Allows your site to capture votes on different topics in the form of multiple choice questions.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = poll.test
+ stylesheets[all][] = poll.css
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/profile/profile.info b/modules/profile/profile.info
+index 54a3c48..891d211 100644
+--- a/modules/profile/profile.info
++++ b/modules/profile/profile.info
+@@ -1,7 +1,7 @@
+ name = Profile
+ description = Supports configurable user profiles.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = profile.test
+ configure = admin/config/people/profile
+@@ -11,7 +11,6 @@ configure = admin/config/people/profile
+ ; See user_system_info_alter().
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/rdf/rdf.info b/modules/rdf/rdf.info
+index 6b2b028..50b21ca 100644
+--- a/modules/rdf/rdf.info
++++ b/modules/rdf/rdf.info
+@@ -1,11 +1,10 @@
+ name = RDF
+ description = Enriches your content with metadata to let other applications (e.g. search engines, aggregators) better understand its relationships and attributes.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = rdf.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/rdf/tests/rdf_test.info b/modules/rdf/tests/rdf_test.info
+index 03ec49f..6b42fc1 100644
+--- a/modules/rdf/tests/rdf_test.info
++++ b/modules/rdf/tests/rdf_test.info
+@@ -1,12 +1,11 @@
+ name = "RDF module tests"
+ description = "Support module for RDF module testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+ dependencies[] = blog
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/search/search.info b/modules/search/search.info
+index c15aa79..88060dd 100644
+--- a/modules/search/search.info
++++ b/modules/search/search.info
+@@ -1,14 +1,13 @@
+ name = Search
+ description = Enables site-wide keyword searching.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = search.extender.inc
+ files[] = search.test
+ configure = admin/config/search/settings
+ stylesheets[all][] = search.css
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/search/tests/search_embedded_form.info b/modules/search/tests/search_embedded_form.info
+index f7df883..7e2595d 100644
+--- a/modules/search/tests/search_embedded_form.info
++++ b/modules/search/tests/search_embedded_form.info
+@@ -1,11 +1,10 @@
+ name = "Search embedded form"
+ description = "Support module for search module testing of embedded forms."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/search/tests/search_extra_type.info b/modules/search/tests/search_extra_type.info
+index af22512..3d57583 100644
+--- a/modules/search/tests/search_extra_type.info
++++ b/modules/search/tests/search_extra_type.info
+@@ -1,11 +1,10 @@
+ name = "Test search type"
+ description = "Support module for search module testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/search/tests/search_node_tags.info b/modules/search/tests/search_node_tags.info
+index 4010a85..c18f075 100644
+--- a/modules/search/tests/search_node_tags.info
++++ b/modules/search/tests/search_node_tags.info
+@@ -1,11 +1,10 @@
+ name = "Test search node tags"
+ description = "Support module for Node search tags testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/shortcut/shortcut.info b/modules/shortcut/shortcut.info
+index 907ecc6..a54b611 100644
+--- a/modules/shortcut/shortcut.info
++++ b/modules/shortcut/shortcut.info
+@@ -1,12 +1,11 @@
+ name = Shortcut
+ description = Allows users to manage customizable lists of shortcut links.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = shortcut.test
+ configure = admin/config/user-interface/shortcut
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/drupal_web_test_case.php b/modules/simpletest/drupal_web_test_case.php
+index 1c7129b..252e61c 100644
+--- a/modules/simpletest/drupal_web_test_case.php
++++ b/modules/simpletest/drupal_web_test_case.php
+@@ -595,7 +595,6 @@ abstract class DrupalTestCase {
+   public function errorHandler($severity, $message, $file = NULL, $line = NULL) {
+     if ($severity & error_reporting()) {
+       $error_map = array(
+-        E_STRICT => 'Run-time notice',
+         E_WARNING => 'Warning',
+         E_NOTICE => 'Notice',
+         E_CORE_ERROR => 'Core error',
+@@ -606,6 +605,11 @@ abstract class DrupalTestCase {
+         E_RECOVERABLE_ERROR => 'Recoverable error',
+       );
+
++      // E_STRICT is deprecated in PHP 8.4.
++      if (PHP_VERSION_ID < 80400) {
++        $error_map[E_STRICT] = 'Run-time notice';
++      }
++
+       // PHP 5.3 adds new error logging constants. Add these conditionally for
+       // backwards compatibility with PHP 5.2.
+       if (defined('E_DEPRECATED')) {
+diff --git a/modules/simpletest/simpletest.info b/modules/simpletest/simpletest.info
+index e5dbbd3..9bfa8a3 100644
+--- a/modules/simpletest/simpletest.info
++++ b/modules/simpletest/simpletest.info
+@@ -1,7 +1,7 @@
+ name = Testing
+ description = Provides a framework for unit and functional testing.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = simpletest.test
+ files[] = drupal_web_test_case.php
+@@ -58,7 +58,6 @@ files[] = tests/upgrade/update.trigger.test
+ files[] = tests/upgrade/update.field.test
+ files[] = tests/upgrade/update.user.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/actions_loop_test.info b/modules/simpletest/tests/actions_loop_test.info
+index 057a7fc..e0ff1bd 100644
+--- a/modules/simpletest/tests/actions_loop_test.info
++++ b/modules/simpletest/tests/actions_loop_test.info
+@@ -1,11 +1,10 @@
+ name = Actions loop test
+ description = Support module for action loop testing.
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/ajax_forms_test.info b/modules/simpletest/tests/ajax_forms_test.info
+index c78e346..c64e4ae 100644
+--- a/modules/simpletest/tests/ajax_forms_test.info
++++ b/modules/simpletest/tests/ajax_forms_test.info
+@@ -2,10 +2,9 @@ name = "AJAX form test mock module"
+ description = "Test for AJAX form calls."
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/ajax_test.info b/modules/simpletest/tests/ajax_test.info
+index 7901336..51ee08d 100644
+--- a/modules/simpletest/tests/ajax_test.info
++++ b/modules/simpletest/tests/ajax_test.info
+@@ -1,11 +1,10 @@
+ name = AJAX Test
+ description = Support module for AJAX framework tests.
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/batch_test.info b/modules/simpletest/tests/batch_test.info
+index 49b5949..866dd67 100644
+--- a/modules/simpletest/tests/batch_test.info
++++ b/modules/simpletest/tests/batch_test.info
+@@ -1,11 +1,10 @@
+ name = "Batch API test"
+ description = "Support module for Batch API tests."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/boot_test_1.info b/modules/simpletest/tests/boot_test_1.info
+index 1f4c810..2aa6a4a 100644
+--- a/modules/simpletest/tests/boot_test_1.info
++++ b/modules/simpletest/tests/boot_test_1.info
+@@ -2,10 +2,9 @@ name = Early bootstrap tests
+ description = A support module for hook_boot testing.
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/boot_test_2.info b/modules/simpletest/tests/boot_test_2.info
+index df5e01d..f51db91 100644
+--- a/modules/simpletest/tests/boot_test_2.info
++++ b/modules/simpletest/tests/boot_test_2.info
+@@ -2,10 +2,9 @@ name = Early bootstrap tests
+ description = A support module for hook_boot hook testing.
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/common_test.info b/modules/simpletest/tests/common_test.info
+index 828196a..278595f 100644
+--- a/modules/simpletest/tests/common_test.info
++++ b/modules/simpletest/tests/common_test.info
+@@ -1,13 +1,12 @@
+ name = "Common Test"
+ description = "Support module for Common tests."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ stylesheets[all][] = common_test.css
+ stylesheets[print][] = common_test.print.css
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/common_test_cron_helper.info b/modules/simpletest/tests/common_test_cron_helper.info
+index 5190ebb..60abd10 100644
+--- a/modules/simpletest/tests/common_test_cron_helper.info
++++ b/modules/simpletest/tests/common_test_cron_helper.info
+@@ -1,11 +1,10 @@
+ name = "Common Test Cron Helper"
+ description = "Helper module for CronRunTestCase::testCronExceptions()."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/database_test.info b/modules/simpletest/tests/database_test.info
+index 07386e7..edcf9d7 100644
+--- a/modules/simpletest/tests/database_test.info
++++ b/modules/simpletest/tests/database_test.info
+@@ -2,10 +2,9 @@ name = "Database Test"
+ description = "Support module for Database layer tests."
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/drupal_autoload_test/drupal_autoload_test.info b/modules/simpletest/tests/drupal_autoload_test/drupal_autoload_test.info
+index 5bff622..68b2148 100644
+--- a/modules/simpletest/tests/drupal_autoload_test/drupal_autoload_test.info
++++ b/modules/simpletest/tests/drupal_autoload_test/drupal_autoload_test.info
+@@ -3,11 +3,10 @@ description = "Support module for testing the code registry."
+ files[] = drupal_autoload_test_interface.inc
+ files[] = drupal_autoload_test_class.inc
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info b/modules/simpletest/tests/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
+index b0b008d..4a6c86f 100644
+--- a/modules/simpletest/tests/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
++++ b/modules/simpletest/tests/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
+@@ -1,11 +1,10 @@
+ name = "Drupal system listing compatible test"
+ description = "Support module for testing the drupal_system_listing function."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info b/modules/simpletest/tests/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
+index 1d147c7..85295b6 100644
+--- a/modules/simpletest/tests/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
++++ b/modules/simpletest/tests/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
+@@ -1,11 +1,10 @@
+ name = "Drupal system listing incompatible test"
+ description = "Support module for testing the drupal_system_listing function."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/entity_cache_test.info b/modules/simpletest/tests/entity_cache_test.info
+index af5b1f5..68d6902 100644
+--- a/modules/simpletest/tests/entity_cache_test.info
++++ b/modules/simpletest/tests/entity_cache_test.info
+@@ -1,12 +1,11 @@
+ name = "Entity cache test"
+ description = "Support module for testing entity cache."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = entity_cache_test_dependency
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/entity_cache_test_dependency.info b/modules/simpletest/tests/entity_cache_test_dependency.info
+index 4bbb37e..7f5e024 100644
+--- a/modules/simpletest/tests/entity_cache_test_dependency.info
++++ b/modules/simpletest/tests/entity_cache_test_dependency.info
+@@ -1,11 +1,10 @@
+ name = "Entity cache test dependency"
+ description = "Support dependency module for testing entity cache."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/entity_crud_hook_test.info b/modules/simpletest/tests/entity_crud_hook_test.info
+index 7b6c2d0..d35d85c 100644
+--- a/modules/simpletest/tests/entity_crud_hook_test.info
++++ b/modules/simpletest/tests/entity_crud_hook_test.info
+@@ -2,10 +2,9 @@ name = "Entity CRUD Hooks Test"
+ description = "Support module for CRUD hook tests."
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/entity_query_access_test.info b/modules/simpletest/tests/entity_query_access_test.info
+index 887aa8b..d6a5d59 100644
+--- a/modules/simpletest/tests/entity_query_access_test.info
++++ b/modules/simpletest/tests/entity_query_access_test.info
+@@ -1,11 +1,10 @@
+ name = "Entity query access test"
+ description = "Support module for checking entity query results."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/error_test.info b/modules/simpletest/tests/error_test.info
+index 4b4da45..4a97aed 100644
+--- a/modules/simpletest/tests/error_test.info
++++ b/modules/simpletest/tests/error_test.info
+@@ -1,11 +1,10 @@
+ name = "Error test"
+ description = "Support module for error and exception testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/file_test.info b/modules/simpletest/tests/file_test.info
+index f1dee61..33a29e1 100644
+--- a/modules/simpletest/tests/file_test.info
++++ b/modules/simpletest/tests/file_test.info
+@@ -1,12 +1,11 @@
+ name = "File test"
+ description = "Support module for file handling tests."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = file_test.module
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/filter_test.info b/modules/simpletest/tests/filter_test.info
+index 91e88a0..d58155f 100644
+--- a/modules/simpletest/tests/filter_test.info
++++ b/modules/simpletest/tests/filter_test.info
+@@ -1,11 +1,10 @@
+ name = Filter test module
+ description = Tests filter hooks and functions.
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/form_test.info b/modules/simpletest/tests/form_test.info
+index 5009b4f..1c33f4d 100644
+--- a/modules/simpletest/tests/form_test.info
++++ b/modules/simpletest/tests/form_test.info
+@@ -1,11 +1,10 @@
+ name = "FormAPI Test"
+ description = "Support module for Form API tests."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/image_test.info b/modules/simpletest/tests/image_test.info
+index 2b6ffde..7d96d3c 100644
+--- a/modules/simpletest/tests/image_test.info
++++ b/modules/simpletest/tests/image_test.info
+@@ -1,11 +1,10 @@
+ name = "Image test"
+ description = "Support module for image toolkit tests."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/menu_test.info b/modules/simpletest/tests/menu_test.info
+index 6036a22..6a4fac0 100644
+--- a/modules/simpletest/tests/menu_test.info
++++ b/modules/simpletest/tests/menu_test.info
+@@ -1,11 +1,10 @@
+ name = "Hook menu tests"
+ description = "Support module for menu hook testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/module_test.info b/modules/simpletest/tests/module_test.info
+index 2b53961..06f3870 100644
+--- a/modules/simpletest/tests/module_test.info
++++ b/modules/simpletest/tests/module_test.info
+@@ -1,11 +1,10 @@
+ name = "Module test"
+ description = "Support module for module system testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/path_test.info b/modules/simpletest/tests/path_test.info
+index c216a31..f33c2e1 100644
+--- a/modules/simpletest/tests/path_test.info
++++ b/modules/simpletest/tests/path_test.info
+@@ -1,11 +1,10 @@
+ name = "Hook path tests"
+ description = "Support module for path hook testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/psr_0_test/psr_0_test.info b/modules/simpletest/tests/psr_0_test/psr_0_test.info
+index 88bf7c7..9653ea7 100644
+--- a/modules/simpletest/tests/psr_0_test/psr_0_test.info
++++ b/modules/simpletest/tests/psr_0_test/psr_0_test.info
+@@ -5,7 +5,6 @@ core = 7.x
+ hidden = TRUE
+ package = Testing
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/psr_4_test/psr_4_test.info b/modules/simpletest/tests/psr_4_test/psr_4_test.info
+index 3ee3f1d..93253dd 100644
+--- a/modules/simpletest/tests/psr_4_test/psr_4_test.info
++++ b/modules/simpletest/tests/psr_4_test/psr_4_test.info
+@@ -5,7 +5,6 @@ core = 7.x
+ hidden = TRUE
+ package = Testing
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/requirements1_test.info b/modules/simpletest/tests/requirements1_test.info
+index 540299c..3312482 100644
+--- a/modules/simpletest/tests/requirements1_test.info
++++ b/modules/simpletest/tests/requirements1_test.info
+@@ -1,11 +1,10 @@
+ name = Requirements 1 Test
+ description = "Tests that a module is not installed when it fails hook_requirements('install')."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/requirements2_test.info b/modules/simpletest/tests/requirements2_test.info
+index a402e20..b9cb893 100644
+--- a/modules/simpletest/tests/requirements2_test.info
++++ b/modules/simpletest/tests/requirements2_test.info
+@@ -3,11 +3,10 @@ description = "Tests that a module is not installed when the one it depends on f
+ dependencies[] = requirements1_test
+ dependencies[] = comment
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/session_test.info b/modules/simpletest/tests/session_test.info
+index d3cdbe6..ae32276 100644
+--- a/modules/simpletest/tests/session_test.info
++++ b/modules/simpletest/tests/session_test.info
+@@ -1,11 +1,10 @@
+ name = "Session test"
+ description = "Support module for session data testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_admin_test.info b/modules/simpletest/tests/system_admin_test.info
+index ab8b1c5..97b7d46 100644
+--- a/modules/simpletest/tests/system_admin_test.info
++++ b/modules/simpletest/tests/system_admin_test.info
+@@ -1,12 +1,11 @@
+ name = System Admin Test
+ description = 'Support module for testing system.admin.inc.'
+ package = Only For Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = FALSE
+ configure = config/broken
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_dependencies_test.info b/modules/simpletest/tests/system_dependencies_test.info
+index c752af4..f3dec4e 100644
+--- a/modules/simpletest/tests/system_dependencies_test.info
++++ b/modules/simpletest/tests/system_dependencies_test.info
+@@ -1,12 +1,11 @@
+ name = "System dependency test"
+ description = "Support module for testing system dependencies."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+ dependencies[] = _missing_dependency
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_incompatible_core_version_dependencies_test.info b/modules/simpletest/tests/system_incompatible_core_version_dependencies_test.info
+index 6399a8d..8db437f 100644
+--- a/modules/simpletest/tests/system_incompatible_core_version_dependencies_test.info
++++ b/modules/simpletest/tests/system_incompatible_core_version_dependencies_test.info
+@@ -1,12 +1,11 @@
+ name = "System incompatible core version dependencies test"
+ description = "Support module for testing system dependencies."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+ dependencies[] = system_incompatible_core_version_test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_incompatible_core_version_test.info b/modules/simpletest/tests/system_incompatible_core_version_test.info
+index 1249eae..ddc7317 100644
+--- a/modules/simpletest/tests/system_incompatible_core_version_test.info
++++ b/modules/simpletest/tests/system_incompatible_core_version_test.info
+@@ -1,11 +1,10 @@
+ name = "System incompatible core version test"
+ description = "Support module for testing system dependencies."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 5.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_incompatible_module_version_dependencies_test.info b/modules/simpletest/tests/system_incompatible_module_version_dependencies_test.info
+index 1676d6f..51ed0be 100644
+--- a/modules/simpletest/tests/system_incompatible_module_version_dependencies_test.info
++++ b/modules/simpletest/tests/system_incompatible_module_version_dependencies_test.info
+@@ -1,13 +1,12 @@
+ name = "System incompatible module version dependencies test"
+ description = "Support module for testing system dependencies."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+ ; system_incompatible_module_version_test declares version 1.0
+ dependencies[] = system_incompatible_module_version_test (>2.0)
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_incompatible_module_version_test.info b/modules/simpletest/tests/system_incompatible_module_version_test.info
+index 2934db5..6ffe545 100644
+--- a/modules/simpletest/tests/system_incompatible_module_version_test.info
++++ b/modules/simpletest/tests/system_incompatible_module_version_test.info
+@@ -1,11 +1,10 @@
+ name = "System incompatible module version test"
+ description = "Support module for testing system dependencies."
+ package = Testing
+-version = 1.0
++# version = 1.0
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_null_version_test.info b/modules/simpletest/tests/system_null_version_test.info
+index 3da869c..4db2adc 100644
+--- a/modules/simpletest/tests/system_null_version_test.info
++++ b/modules/simpletest/tests/system_null_version_test.info
+@@ -4,7 +4,6 @@ package = Only For Testing
+ core = 7.x
+ hidden = FALSE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_project_namespace_test.info b/modules/simpletest/tests/system_project_namespace_test.info
+index 82a6d31..a7bdc0e 100644
+--- a/modules/simpletest/tests/system_project_namespace_test.info
++++ b/modules/simpletest/tests/system_project_namespace_test.info
+@@ -1,12 +1,11 @@
+ name = "System project namespace test"
+ description = "Support module for testing project namespace dependencies."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+ dependencies[] = drupal:filter
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_requires_null_version_test.info b/modules/simpletest/tests/system_requires_null_version_test.info
+index ea83a32..d33d7c0 100644
+--- a/modules/simpletest/tests/system_requires_null_version_test.info
++++ b/modules/simpletest/tests/system_requires_null_version_test.info
+@@ -2,11 +2,10 @@ name = "System requires null version test"
+ description = "Support module for testing system_modules()."
+ package = Only For Testing
+ core = 7.x
+-version = VERSION
++# version = VERSION
+ hidden = FALSE
+ dependencies[] = system_null_version_test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/system_test.info b/modules/simpletest/tests/system_test.info
+index b06d5a2..6e4b697 100644
+--- a/modules/simpletest/tests/system_test.info
++++ b/modules/simpletest/tests/system_test.info
+@@ -1,12 +1,11 @@
+ name = System test
+ description = Support module for system testing.
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = system_test.module
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/taxonomy_nodes_test.info b/modules/simpletest/tests/taxonomy_nodes_test.info
+index 5a64a08..4bbe67c 100644
+--- a/modules/simpletest/tests/taxonomy_nodes_test.info
++++ b/modules/simpletest/tests/taxonomy_nodes_test.info
+@@ -1,11 +1,10 @@
+ name = "Taxonomy module node list tests"
+ description = "Support module for taxonomy node list related testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/taxonomy_test.info b/modules/simpletest/tests/taxonomy_test.info
+index 1cdb6e1..db0c4aa 100644
+--- a/modules/simpletest/tests/taxonomy_test.info
++++ b/modules/simpletest/tests/taxonomy_test.info
+@@ -1,12 +1,11 @@
+ name = "Taxonomy test module"
+ description = "Tests functions and hooks not used in core".
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+ dependencies[] = taxonomy
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/theme_test.info b/modules/simpletest/tests/theme_test.info
+index 5aec25a..1181a66 100644
+--- a/modules/simpletest/tests/theme_test.info
++++ b/modules/simpletest/tests/theme_test.info
+@@ -1,11 +1,10 @@
+ name = "Theme test"
+ description = "Support module for theme system testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/themes/test_basetheme/test_basetheme.info b/modules/simpletest/tests/themes/test_basetheme/test_basetheme.info
+index 6745dfc..8092e57 100644
+--- a/modules/simpletest/tests/themes/test_basetheme/test_basetheme.info
++++ b/modules/simpletest/tests/themes/test_basetheme/test_basetheme.info
+@@ -6,7 +6,6 @@ hidden = TRUE
+ settings[basetheme_only] = base theme value
+ settings[subtheme_override] = base theme value
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/themes/test_subtheme/test_subtheme.info b/modules/simpletest/tests/themes/test_subtheme/test_subtheme.info
+index c768549..76a741b 100644
+--- a/modules/simpletest/tests/themes/test_subtheme/test_subtheme.info
++++ b/modules/simpletest/tests/themes/test_subtheme/test_subtheme.info
+@@ -6,7 +6,6 @@ hidden = TRUE
+
+ settings[subtheme_override] = subtheme value
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/themes/test_theme/test_theme.info b/modules/simpletest/tests/themes/test_theme/test_theme.info
+index cfeafdd..8958675 100644
+--- a/modules/simpletest/tests/themes/test_theme/test_theme.info
++++ b/modules/simpletest/tests/themes/test_theme/test_theme.info
+@@ -17,7 +17,6 @@ stylesheets[all][] = system.base.css
+
+ settings[theme_test_setting] = default value
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/themes/test_theme_nyan_cat/test_theme_nyan_cat.info b/modules/simpletest/tests/themes/test_theme_nyan_cat/test_theme_nyan_cat.info
+index 6c6f45f..a306ea0 100644
+--- a/modules/simpletest/tests/themes/test_theme_nyan_cat/test_theme_nyan_cat.info
++++ b/modules/simpletest/tests/themes/test_theme_nyan_cat/test_theme_nyan_cat.info
+@@ -4,7 +4,6 @@ core = 7.x
+ hidden = TRUE
+ engine = nyan_cat
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/update_script_test.info b/modules/simpletest/tests/update_script_test.info
+index d0dfff7..735b11b 100644
+--- a/modules/simpletest/tests/update_script_test.info
++++ b/modules/simpletest/tests/update_script_test.info
+@@ -1,11 +1,10 @@
+ name = "Update script test"
+ description = "Support module for update script testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/update_test_1.info b/modules/simpletest/tests/update_test_1.info
+index b8c1f0e..3ce6e0f 100644
+--- a/modules/simpletest/tests/update_test_1.info
++++ b/modules/simpletest/tests/update_test_1.info
+@@ -1,11 +1,10 @@
+ name = "Update test"
+ description = "Support module for update testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/update_test_2.info b/modules/simpletest/tests/update_test_2.info
+index b8c1f0e..3ce6e0f 100644
+--- a/modules/simpletest/tests/update_test_2.info
++++ b/modules/simpletest/tests/update_test_2.info
+@@ -1,11 +1,10 @@
+ name = "Update test"
+ description = "Support module for update testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/update_test_3.info b/modules/simpletest/tests/update_test_3.info
+index b8c1f0e..3ce6e0f 100644
+--- a/modules/simpletest/tests/update_test_3.info
++++ b/modules/simpletest/tests/update_test_3.info
+@@ -1,11 +1,10 @@
+ name = "Update test"
+ description = "Support module for update testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/url_alter_test.info b/modules/simpletest/tests/url_alter_test.info
+index 058459a..02c6a0a 100644
+--- a/modules/simpletest/tests/url_alter_test.info
++++ b/modules/simpletest/tests/url_alter_test.info
+@@ -2,10 +2,9 @@ name = Url_alter tests
+ description = A support modules for url_alter hook testing.
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/simpletest/tests/xmlrpc_test.info b/modules/simpletest/tests/xmlrpc_test.info
+index c08a4e2..821f0f3 100644
+--- a/modules/simpletest/tests/xmlrpc_test.info
++++ b/modules/simpletest/tests/xmlrpc_test.info
+@@ -1,11 +1,10 @@
+ name = "XML-RPC Test"
+ description = "Support module for XML-RPC tests according to the validator1 specification."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/statistics/statistics.info b/modules/statistics/statistics.info
+index eaad1f3..f1210d8 100644
+--- a/modules/statistics/statistics.info
++++ b/modules/statistics/statistics.info
+@@ -1,12 +1,11 @@
+ name = Statistics
+ description = Logs access statistics for your site.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = statistics.test
+ configure = admin/config/system/statistics
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/syslog/syslog.info b/modules/syslog/syslog.info
+index 67c596a..a476978 100644
+--- a/modules/syslog/syslog.info
++++ b/modules/syslog/syslog.info
+@@ -1,12 +1,11 @@
+ name = Syslog
+ description = Logs and records system events to syslog.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = syslog.test
+ configure = admin/config/development/logging
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/system/system.info b/modules/system/system.info
+index f55b778..987f0c4 100644
+--- a/modules/system/system.info
++++ b/modules/system/system.info
+@@ -1,7 +1,7 @@
+ name = System
+ description = Handles general site configuration for administrators.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = system.archiver.inc
+ files[] = system.mail.inc
+@@ -12,7 +12,6 @@ files[] = system.test
+ required = TRUE
+ configure = admin/config/system
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/system/system.module b/modules/system/system.module
+index 4986aa5..26e2faf 100644
+--- a/modules/system/system.module
++++ b/modules/system/system.module
+@@ -1233,8 +1233,8 @@ function system_library() {
+   // jQuery BBQ plugin.
+   $libraries['jquery.bbq'] = array(
+     'title' => 'jQuery BBQ',
+-    'website' => 'http://benalman.com/projects/jquery-bbq-plugin/',
+-    'version' => '1.2.1',
++    'website' => 'https://github.com/yiisoft/yii/blob/master/framework/web/js/source/jquery.ba-bbq.js',
++    'version' => '1.4pre',
+     'js' => array(
+       'misc/jquery.ba-bbq.js' => array(),
+     ),
+diff --git a/modules/system/tests/cron_queue_test.info b/modules/system/tests/cron_queue_test.info
+index e940feb..3f0b552 100644
+--- a/modules/system/tests/cron_queue_test.info
++++ b/modules/system/tests/cron_queue_test.info
+@@ -1,11 +1,10 @@
+ name = Cron Queue test
+ description = 'Support module for the cron queue runner.'
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/system/tests/system_cron_test.info b/modules/system/tests/system_cron_test.info
+index c23e5e7..6cffb0f 100644
+--- a/modules/system/tests/system_cron_test.info
++++ b/modules/system/tests/system_cron_test.info
+@@ -1,11 +1,10 @@
+ name = System Cron Test
+ description = 'Support module for testing the system_cron().'
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/taxonomy/taxonomy.info b/modules/taxonomy/taxonomy.info
+index b5174b3..37550b6 100644
+--- a/modules/taxonomy/taxonomy.info
++++ b/modules/taxonomy/taxonomy.info
+@@ -1,14 +1,13 @@
+ name = Taxonomy
+ description = Enables the categorization of content.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = options
+ files[] = taxonomy.module
+ files[] = taxonomy.test
+ configure = admin/structure/taxonomy
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/toolbar/toolbar.info b/modules/toolbar/toolbar.info
+index 329aa41..6bb238e 100644
+--- a/modules/toolbar/toolbar.info
++++ b/modules/toolbar/toolbar.info
+@@ -2,10 +2,9 @@ name = Toolbar
+ description = Provides a toolbar that shows the top-level administration menu items and links from other modules.
+ core = 7.x
+ package = Core
+-version = VERSION
++# version = VERSION
+ files[] = toolbar.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/tracker/tracker.info b/modules/tracker/tracker.info
+index edc0ab8..b97d5f9 100644
+--- a/modules/tracker/tracker.info
++++ b/modules/tracker/tracker.info
+@@ -2,11 +2,10 @@ name = Tracker
+ description = Enables tracking of recent content for users.
+ dependencies[] = comment
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = tracker.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/translation/tests/translation_test.info b/modules/translation/tests/translation_test.info
+index cbffc89..9dde41b 100644
+--- a/modules/translation/tests/translation_test.info
++++ b/modules/translation/tests/translation_test.info
+@@ -2,10 +2,9 @@ name = "Content Translation Test"
+ description = "Support module for the content translation tests."
+ core = 7.x
+ package = Testing
+-version = VERSION
++# version = VERSION
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/translation/translation.info b/modules/translation/translation.info
+index 10abb41..61d9ed2 100644
+--- a/modules/translation/translation.info
++++ b/modules/translation/translation.info
+@@ -2,11 +2,10 @@ name = Content translation
+ description = Allows content to be translated into different languages.
+ dependencies[] = locale
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = translation.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/trigger/tests/trigger_test.info b/modules/trigger/tests/trigger_test.info
+index 0cf90b3..390c5ce 100644
+--- a/modules/trigger/tests/trigger_test.info
++++ b/modules/trigger/tests/trigger_test.info
+@@ -4,7 +4,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/trigger/trigger.info b/modules/trigger/trigger.info
+index c25e207..70ccbab 100644
+--- a/modules/trigger/trigger.info
++++ b/modules/trigger/trigger.info
+@@ -1,12 +1,11 @@
+ name = Trigger
+ description = Enables actions to be fired on certain system events, such as when new content is created.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = trigger.test
+ configure = admin/structure/trigger
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/update/tests/aaa_update_test.info b/modules/update/tests/aaa_update_test.info
+index 930d0f0..1a6964f 100644
+--- a/modules/update/tests/aaa_update_test.info
++++ b/modules/update/tests/aaa_update_test.info
+@@ -4,7 +4,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/update/tests/bbb_update_test.info b/modules/update/tests/bbb_update_test.info
+index 82c797b..2ab1582 100644
+--- a/modules/update/tests/bbb_update_test.info
++++ b/modules/update/tests/bbb_update_test.info
+@@ -4,7 +4,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/update/tests/ccc_update_test.info b/modules/update/tests/ccc_update_test.info
+index 22247a9..8ef1647 100644
+--- a/modules/update/tests/ccc_update_test.info
++++ b/modules/update/tests/ccc_update_test.info
+@@ -4,7 +4,6 @@ package = Testing
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/update/tests/themes/update_test_admintheme/update_test_admintheme.info b/modules/update/tests/themes/update_test_admintheme/update_test_admintheme.info
+index 87f4f64..f2c9633 100644
+--- a/modules/update/tests/themes/update_test_admintheme/update_test_admintheme.info
++++ b/modules/update/tests/themes/update_test_admintheme/update_test_admintheme.info
+@@ -3,7 +3,6 @@ description = Test theme which is used as admin theme.
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/update/tests/themes/update_test_basetheme/update_test_basetheme.info b/modules/update/tests/themes/update_test_basetheme/update_test_basetheme.info
+index df0a777..fd92cc3 100644
+--- a/modules/update/tests/themes/update_test_basetheme/update_test_basetheme.info
++++ b/modules/update/tests/themes/update_test_basetheme/update_test_basetheme.info
+@@ -3,7 +3,6 @@ description = Test theme which acts as a base theme for other test subthemes.
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/update/tests/themes/update_test_subtheme/update_test_subtheme.info b/modules/update/tests/themes/update_test_subtheme/update_test_subtheme.info
+index b387e9d..6db9fc5 100644
+--- a/modules/update/tests/themes/update_test_subtheme/update_test_subtheme.info
++++ b/modules/update/tests/themes/update_test_subtheme/update_test_subtheme.info
+@@ -4,7 +4,6 @@ core = 7.x
+ base theme = update_test_basetheme
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/update/tests/update_test.info b/modules/update/tests/update_test.info
+index 1a26422..b5c3129 100644
+--- a/modules/update/tests/update_test.info
++++ b/modules/update/tests/update_test.info
+@@ -1,11 +1,10 @@
+ name = Update test
+ description = Support module for update module testing.
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/update/update.info b/modules/update/update.info
+index 9ea3ce0..7c8f4cf 100644
+--- a/modules/update/update.info
++++ b/modules/update/update.info
+@@ -1,12 +1,11 @@
+ name = Update manager
+ description = Checks for available updates, and can securely install or update modules and themes via a web interface.
+-version = VERSION
++# version = VERSION
+ package = Core
+ core = 7.x
+ files[] = update.test
+ configure = admin/reports/updates/settings
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/user/tests/anonymous_user_unblock_test.info b/modules/user/tests/anonymous_user_unblock_test.info
+index e4f1e9f..9f95ee4 100644
+--- a/modules/user/tests/anonymous_user_unblock_test.info
++++ b/modules/user/tests/anonymous_user_unblock_test.info
+@@ -1,11 +1,10 @@
+ name = Anonymous user unblock action tests
+ description = Support module for anonymous user unblock action testing.
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/user/tests/user_email_validation_test.info b/modules/user/tests/user_email_validation_test.info
+index a16e518..887023c 100644
+--- a/modules/user/tests/user_email_validation_test.info
++++ b/modules/user/tests/user_email_validation_test.info
+@@ -1,11 +1,10 @@
+ name = "User module e-mail validation tests"
+ description = "Support module for user e-mail validation testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/user/tests/user_flood_test.info b/modules/user/tests/user_flood_test.info
+index 684c4bf..3b3f11f 100644
+--- a/modules/user/tests/user_flood_test.info
++++ b/modules/user/tests/user_flood_test.info
+@@ -1,11 +1,10 @@
+ name = "User module flood control tests"
+ description = "Support module for user flood control testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/user/tests/user_form_test.info b/modules/user/tests/user_form_test.info
+index ab916b1..8e75a0b 100644
+--- a/modules/user/tests/user_form_test.info
++++ b/modules/user/tests/user_form_test.info
+@@ -1,11 +1,10 @@
+ name = "User module form tests"
+ description = "Support module for user form testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/user/tests/user_session_test.info b/modules/user/tests/user_session_test.info
+index e367d31..ae62fdc 100644
+--- a/modules/user/tests/user_session_test.info
++++ b/modules/user/tests/user_session_test.info
+@@ -1,11 +1,10 @@
+ name = "User module session tests"
+ description = "Support module for user session testing."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/modules/user/user.info b/modules/user/user.info
+index 99c6002..3890576 100644
+--- a/modules/user/user.info
++++ b/modules/user/user.info
+@@ -1,7 +1,7 @@
+ name = User
+ description = Manages the user registration and login system.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ files[] = user.module
+ files[] = user.test
+@@ -9,7 +9,6 @@ required = TRUE
+ configure = admin/config/people
+ stylesheets[all][] = user.css
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/profiles/minimal/minimal.info b/profiles/minimal/minimal.info
+index 5bc8fe7..c200ca7 100644
+--- a/profiles/minimal/minimal.info
++++ b/profiles/minimal/minimal.info
+@@ -1,11 +1,10 @@
+ name = Minimal
+ description = Start with only a few modules enabled.
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = block
+ dependencies[] = dblog
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/profiles/standard/standard.info b/profiles/standard/standard.info
+index 8db0e1e..37654aa 100644
+--- a/profiles/standard/standard.info
++++ b/profiles/standard/standard.info
+@@ -1,6 +1,6 @@
+ name = Standard
+ description = Install with commonly used features pre-configured.
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ dependencies[] = block
+ dependencies[] = color
+@@ -24,7 +24,6 @@ dependencies[] = field_ui
+ dependencies[] = file
+ dependencies[] = rdf
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/profiles/testing/modules/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info b/profiles/testing/modules/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
+index 62810be..0103ba9 100644
+--- a/profiles/testing/modules/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
++++ b/profiles/testing/modules/drupal_system_listing_compatible_test/drupal_system_listing_compatible_test.info
+@@ -1,12 +1,11 @@
+ name = "Drupal system listing compatible test"
+ description = "Support module for testing the drupal_system_listing function."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+ files[] = drupal_system_listing_compatible_test.test
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/profiles/testing/modules/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info b/profiles/testing/modules/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
+index 4c11d79..766dbcd 100644
+--- a/profiles/testing/modules/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
++++ b/profiles/testing/modules/drupal_system_listing_incompatible_test/drupal_system_listing_incompatible_test.info
+@@ -1,14 +1,13 @@
+ name = "Drupal system listing incompatible test"
+ description = "Support module for testing the drupal_system_listing function."
+ package = Testing
+-version = VERSION
++# version = VERSION
+ ; This deliberately has the wrong core version, to test that it does not take
+ ; precedence over the version of the same module that is in the
+ ; modules/simpletest/tests directory.
+ core = 6.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/profiles/testing/testing.info b/profiles/testing/testing.info
+index 985fb8c..2fbce46 100644
+--- a/profiles/testing/testing.info
++++ b/profiles/testing/testing.info
+@@ -1,10 +1,9 @@
+ name = Testing
+ description = Minimal profile for running tests. Includes absolutely required modules only.
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ hidden = TRUE
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/themes/bartik/bartik.info b/themes/bartik/bartik.info
+index 5a1ecbf..5d603bf 100644
+--- a/themes/bartik/bartik.info
++++ b/themes/bartik/bartik.info
+@@ -2,7 +2,7 @@
+ name = Bartik
+ description = A flexible, recolorable theme with many regions.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+
+ stylesheets[all][] = css/layout.css
+@@ -34,7 +34,6 @@ regions[footer] = Footer
+ settings[shortcut_module_link] = 0
+
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/themes/garland/garland.info b/themes/garland/garland.info
+index 033d002..d6e38cc 100644
+--- a/themes/garland/garland.info
++++ b/themes/garland/garland.info
+@@ -1,13 +1,12 @@
+ name = Garland
+ description = A multi-column theme which can be configured to modify colors and switch between fixed and fluid width layouts.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ stylesheets[all][] = style.css
+ stylesheets[print][] = print.css
+ settings[garland_width] = fluid
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/themes/seven/seven.info b/themes/seven/seven.info
+index 7671dbb..fe56d4c 100644
+--- a/themes/seven/seven.info
++++ b/themes/seven/seven.info
+@@ -1,7 +1,7 @@
+ name = Seven
+ description = A simple one-column, tableless, fluid width administration theme.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ stylesheets[screen][] = reset.css
+ stylesheets[screen][] = style.css
+@@ -13,7 +13,6 @@ regions[page_bottom] = Page bottom
+ regions[sidebar_first] = First sidebar
+ regions_hidden[] = sidebar_first
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
+diff --git a/themes/stark/stark.info b/themes/stark/stark.info
+index c555729..1f8fff8 100644
+--- a/themes/stark/stark.info
++++ b/themes/stark/stark.info
+@@ -1,11 +1,10 @@
+ name = Stark
+ description = This theme demonstrates Drupal's default HTML markup and CSS styles. To learn how to build your own theme and override Drupal's default code, see the <a href="http://drupal.org/theme-guide">Theming Guide</a>.
+ package = Core
+-version = VERSION
++# version = VERSION
+ core = 7.x
+ stylesheets[all][] = layout.css
+
+-; Information added by Drupal.org packaging script on 2024-12-04
+-version = "7.103"
+-project = "drupal"
+-datestamp = "1733324608"
++version = 7.106
++project = drupal
++datestamp = 1787164245
