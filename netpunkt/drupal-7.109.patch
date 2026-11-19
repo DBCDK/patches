@@ -1,0 +1,106 @@
+diff --git a/D7ES_CHANGELOG.txt b/D7ES_CHANGELOG.txt
+index 5d05864ed39..f747b48cea5 100644
+--- a/D7ES_CHANGELOG.txt
++++ b/D7ES_CHANGELOG.txt
+@@ -1,3 +1,10 @@
++Drupal 7.110, XXXX-XX-XX
++------------------------
++
++Drupal 7.109, 2026-11-18
++------------------------
++- Security: Removes install.php, see https://www.drupal.org/sa-core-2026-017. Instead use `drush site-install` for new sites.
++
+ Drupal 7.108, 2026-11-04
+ ------------------------
+ - Security: Restores the `DrupalCacheArray::__destruct()` hardening from SA-CORE-2024-008 that was lost in Drupal 7.103.
+diff --git a/includes/bootstrap.inc b/includes/bootstrap.inc
+index d388abaa5cd..5c988aa405d 100644
+--- a/includes/bootstrap.inc
++++ b/includes/bootstrap.inc
+@@ -8,7 +8,7 @@
+ /**
+  * The current system version.
+  */
+-define('VERSION', '7.108');
++define('VERSION', '7.109');
+ 
+ /**
+  * Core API compatibility.
+diff --git a/install.php b/install.php
+deleted file mode 100644
+index 566c6d04bbe..00000000000
+--- a/install.php
++++ /dev/null
+@@ -1,26 +0,0 @@
+-<?php
+-
+-/**
+- * @file
+- * Initiates a browser-based installation of Drupal.
+- */
+-
+-/**
+- * Defines the root directory of the Drupal installation.
+- */
+-define('DRUPAL_ROOT', getcwd());
+-
+-/**
+- * Global flag to indicate the site is in installation mode.
+- */
+-define('MAINTENANCE_MODE', 'install');
+-
+-// Exit early if running an incompatible PHP version to avoid fatal errors.
+-if (version_compare(PHP_VERSION, '5.6.0') < 0) {
+-  print 'Your PHP installation is too old. Drupal requires at least PHP 5.6. See the <a href="https://www.drupal.org/docs/7/system-requirements">system requirements</a> page for more information.';
+-  exit;
+-}
+-
+-// Start the installer.
+-require_once DRUPAL_ROOT . '/includes/install.core.inc';
+-install_drupal();
+diff --git a/modules/simpletest/simpletest.test b/modules/simpletest/simpletest.test
+index 8959a892f88..836dc896dfe 100644
+--- a/modules/simpletest/simpletest.test
++++ b/modules/simpletest/simpletest.test
+@@ -68,13 +68,6 @@ class SimpleTestFunctionalTest extends DrupalWebTestCase {
+       $this->assertTrue($this->drupalGetHeader('Date'), 'An HTTP header was received.');
+       $this->assertTitle(t('Welcome to @site-name | @site-name', array('@site-name' => variable_get('site_name', 'Drupal'))), 'Site title matches.');
+       $this->assertNoTitle('Foo', 'Site title does not match.');
+-      // Make sure that we are locked out of the installer when prefixing
+-      // using the user-agent header. This is an important security check.
+-      global $base_url;
+-
+-      $this->drupalGet($base_url . '/install.php', array('external' => TRUE));
+-      $this->assertResponse(403, 'Cannot access install.php with a "simpletest" user-agent header.');
+-
+       $user = $this->drupalCreateUser();
+       $this->drupalLogin($user);
+       $headers = $this->drupalGetHeaders(TRUE);
+diff --git a/modules/system/system.test b/modules/system/system.test
+index 312b90a7940..6b5b0c0cf3c 100644
+--- a/modules/system/system.test
++++ b/modules/system/system.test
+@@ -3390,3 +3390,23 @@ class HtaccessTest extends DrupalWebTestCase {
+     $this->assertResponse($response_code, "Response code to $path should be $response_code");
+   }
+ }
++
++/**
++ * Tests that the web installer has been removed.
++ */
++class InstallScriptRemovedTestCase extends DrupalUnitTestCase {
++  public static function getInfo() {
++    return array(
++      'name' => 'Installer removed',
++      'description' => 'Tests that install.php does not exist.',
++      'group' => 'System',
++    );
++  }
++
++  /**
++   * Tests that install.php is not present in the Drupal root.
++   */
++  function testInstallScriptRemoved() {
++    $this->assertFalse(file_exists(DRUPAL_ROOT . '/install.php'), 'install.php does not exist.');
++  }
++}
